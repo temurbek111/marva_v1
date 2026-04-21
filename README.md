@@ -33,8 +33,9 @@ npm run dev
 3. `telegram-web-app.js` avtomatik yuklanadi.
 4. Telegram ichida ochilganda user data `window.Telegram.WebApp.initDataUnsafe.user` orqali olinadi.
 
-## Keyingi bosqich
-- Supabase bilan real products/orders ulash
-- Admin panel qo‘shish
-- OTP auth ulash
-- PDF katalogni bazaga import script yozish
+## Features:
+- Supabase bilan real products/orders ulangan
+- Admin panelli
+- OTP auth 
+- PDF katalogni bazaga import qilina olinishi
+  
