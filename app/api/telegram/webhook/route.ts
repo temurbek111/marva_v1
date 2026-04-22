@@ -34,16 +34,15 @@ export async function POST(req: NextRequest) {
     const message = update.message;
     const callback = update.callback_query;
 
-    if (message?.text === "/start") {
-      await telegramBot("sendMessage", {
-        chat_id: message.chat.id,
-        text: getText(getUserLang(update), "chooseLanguage"),
-        reply_markup: languageKeyboard(),
-      });
+   if (message?.text === "/start") {
+  await telegramBot("sendMessage", {
+    chat_id: message.chat.id,
+    text: getText(getUserLang(update), "chooseLanguage"),
+    reply_markup: languageKeyboard(),
+  });
 
-      return NextResponse.json({ ok: true });
-    }
-
+  return NextResponse.json({ ok: true });
+}
     if (callback) {
       const data = String(callback.data || "");
       const chatId = callback.message?.chat?.id;
