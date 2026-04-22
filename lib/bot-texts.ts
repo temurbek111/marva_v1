@@ -14,8 +14,8 @@ export const TEXTS = {
     contactText: [
       "🦷 Marva Dental",
       "",
-      "📞 Telefon: +998 XX XXX XX XX",
-      "📍 Manzil: Toshkent, ...",
+      "📞 Telefon: +998994113020",
+      "📍 Manzil: Toshkent, Olmazor, Farobiy 94",
       "🕘 Ish vaqti: Du-Sha 9:00 - 18:00",
       "🚚 Yetkazib berish: Toshkent bo‘ylab mavjud",
     ].join("\n"),
@@ -36,8 +36,8 @@ export const TEXTS = {
     contactText: [
       "🦷 Marva Dental",
       "",
-      "📞 Телефон: +998 XX XXX XX XX",
-      "📍 Адрес: Ташкент, ...",
+      "📞 Телефон: +998994113020",
+      "📍 Адрес: Ташкент, Алмазар, Фаробий 94",
       "🕘 Время работы: Пн-Сб 9:00 - 18:00",
       "🚚 Доставка: доступна по Ташкенту",
     ].join("\n"),
