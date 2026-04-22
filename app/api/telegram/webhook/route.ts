@@ -28,8 +28,21 @@ async function telegram(method: string, body: Record<string, unknown>) {
 export async function POST(req: NextRequest) {
   try {
     const update = await req.json();
+
+    const message = update.message;
     const callback = update.callback_query;
 
+    // /start uchun
+    if (message?.text === "/start") {
+      await telegram("sendMessage", {
+        chat_id: message.chat.id,
+        text: "Bot ishladi ✅",
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // oddiy message bo'lsa, shunchaki ok qaytaramiz
     if (!callback) {
       return NextResponse.json({ ok: true });
     }
