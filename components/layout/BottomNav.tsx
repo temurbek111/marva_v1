@@ -3,16 +3,36 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Grid2X2, ShoppingCart, User } from "lucide-react";
-
-const items = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/catalog", label: "Katalog", icon: Grid2X2 },
-  { href: "/cart", label: "Savat", icon: ShoppingCart },
-  { href: "/profile", label: "Profil", icon: User },
-];
+import { useAppLang } from "@/components/common/LangProvider";
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { lang, mounted } = useAppLang();
+
+  if (!mounted) return null;
+
+  const items = [
+    {
+      href: "/",
+      label: lang === "uz" ? "Home" : "Главная",
+      icon: Home,
+    },
+    {
+      href: "/catalog",
+      label: lang === "uz" ? "Katalog" : "Каталог",
+      icon: Grid2X2,
+    },
+    {
+      href: "/cart",
+      label: lang === "uz" ? "Savat" : "Корзина",
+      icon: ShoppingCart,
+    },
+    {
+      href: "/profile",
+      label: lang === "uz" ? "Profil" : "Профиль",
+      icon: User,
+    },
+  ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-black/5 bg-white/95 backdrop-blur-xl">

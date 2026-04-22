@@ -1,34 +1,87 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { Bell, Search } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Bell } from "lucide-react";
+import { LangSwitcher } from "@/components/common/LangSwitcher";
+import ReelsButton from "@/components/home/ReelsButton";
+import ReelsViewerModal from "@/components/home/ReelsViewerModal";
+import { getActiveReels } from "@/lib/reels";
+import type { Reel } from "@/lib/types";
 
 export function Header() {
-  const router = useRouter();
+  const [reels, setReels] = useState<Reel[]>([]);
+  const [isReelsLoading, setIsReelsLoading] = useState(true);
+  const [isReelsOpen, setIsReelsOpen] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadReels() {
+      try {
+        const data = await getActiveReels();
+
+        if (mounted) {
+          setReels(data);
+        }
+      } catch (error) {
+        console.error("Failed to load reels:", error);
+
+        if (mounted) {
+          setReels([]);
+        }
+      } finally {
+        if (mounted) {
+          setIsReelsLoading(false);
+        }
+      }
+    }
+
+    void loadReels();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
-    <div className="sticky top-0 z-40 border-b border-black/5 bg-white/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-md items-center justify-between px-4 py-4">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[20px] bg-white shadow-[0_10px_25px_rgba(0,0,0,0.08)] ring-1 ring-black/5">
-            <Image src="/logo-mark.png" alt="MARVA logo" width={56} height={56} className="h-14 w-14 object-cover" />
+    <>
+      <div className="sticky top-0 z-40 border-b border-black/5 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-md items-center justify-between px-4 py-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs uppercase tracking-[0.24em] text-[#6B8A84]">
+              Dental market
+            </p>
+
+            <h1 className="truncate text-[20px] font-bold text-[#12332D]">
+              MARVA Dental shop
+            </h1>
           </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-[#4C7A73]">Dental market</p>
-            <h1 className="text-[18px] font-bold text-[#12332D]">MARVA Dental shop</h1>
+
+          <div className="ml-3 flex shrink-0 items-center gap-2">
+            {!isReelsLoading && reels.length > 0 && (
+              <ReelsButton
+                onClick={() => setIsReelsOpen(true)}
+                imageUrl="/logo.png"
+              />
+            )}
+
+            <LangSwitcher />
+
+            <button
+              type="button"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]"
+            >
+              <Bell size={20} />
+            </button>
           </div>
-        </Link>
-        <div className="flex items-center gap-2">
-          <button onClick={() => router.push("/catalog")} className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D] shadow-sm">
-            <Search size={20} strokeWidth={2.2} />
-          </button>
-          <button onClick={() => alert("Bildirishnomalar keyin ulanadi")} className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D] shadow-sm">
-            <Bell size={20} strokeWidth={2.2} />
-          </button>
         </div>
       </div>
-    </div>
+
+      <ReelsViewerModal
+        isOpen={isReelsOpen}
+        reels={reels}
+        onClose={() => setIsReelsOpen(false)}
+      />
+    </>
   );
 }

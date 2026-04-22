@@ -17,6 +17,49 @@ type SavedUser = {
   telegramId?: string | number | null;
 };
 
+type LocalOrderItem = {
+  id?: string | number;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+};
+
+type LocalSavedOrder = {
+  id: string;
+  createdAt: string;
+  status: "new" | "processing" | "delivered" | "cancelled";
+  total: number;
+  items: LocalOrderItem[];
+  address?: string;
+  paymentMethod?: string;
+  userKey: string;
+  telegramId?: string | number | null;
+  phone?: string;
+};
+
+function getOrderUserKey(user: SavedUser) {
+  if (user.telegramId) return `tg:${user.telegramId}`;
+  if (user.phone) return `phone:${user.phone}`;
+  if (user.id) return `id:${user.id}`;
+  return "guest";
+}
+
+function saveOrderToLocalStorage(order: LocalSavedOrder) {
+  try {
+    const saved = localStorage.getItem("marva-orders");
+    const parsed = saved ? JSON.parse(saved) : [];
+    const currentOrders = Array.isArray(parsed) ? parsed : [];
+
+    localStorage.setItem(
+      "marva-orders",
+      JSON.stringify([order, ...currentOrders])
+    );
+  } catch (error) {
+    console.error("Order localStorage save error:", error);
+  }
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, clear } = useCartStore();
@@ -146,6 +189,27 @@ export default function CheckoutPage() {
         console.error("Admin telegramga yuborishda xato:", error);
       }
 
+      const localOrder: LocalSavedOrder = {
+        id: String(order.id),
+        createdAt: new Date().toISOString(),
+        status: "new",
+        total,
+        address: finalAddress,
+        paymentMethod: "Operator bilan tasdiqlanadi",
+        userKey: getOrderUserKey(savedUser),
+        telegramId: savedUser.telegramId ?? null,
+        phone: savedUser.phone,
+        items: items.map((item) => ({
+          id: item.product.id,
+          name: item.product.name,
+          price: item.product.price,
+          quantity: item.quantity,
+          image: item.product.image || "",
+        })),
+      };
+
+      saveOrderToLocalStorage(localOrder);
+
       clear();
       setDone(true);
     } catch (error) {
@@ -159,7 +223,7 @@ export default function CheckoutPage() {
   if (checkingUser) {
     return (
       <>
-        <Container className="py-5">
+        <Container className="py-5 pb-28">
           <div className="rounded-[28px] bg-white p-5 shadow-soft">
             Yuklanmoqda...
           </div>
@@ -173,7 +237,7 @@ export default function CheckoutPage() {
 
   return (
     <>
-      <Container className="py-5">
+      <Container className="py-5 pb-28">
         <div className="rounded-[28px] bg-white p-5 shadow-soft">
           <h1 className="text-2xl font-bold text-marva-900">Checkout</h1>
           <p className="mt-1 text-sm text-marva-700/70">
@@ -200,7 +264,7 @@ export default function CheckoutPage() {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="mt-5 space-y-4 rounded-[28px] bg-white p-5 shadow-soft"
+            className="mt-5 space-y-4 rounded-[28px] bg-white p-5 pb-36 shadow-soft"
           >
             <div className="rounded-2xl bg-marva-50 p-4">
               <p className="text-xs text-marva-700/70">Mijoz</p>
@@ -248,13 +312,14 @@ export default function CheckoutPage() {
               </p>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-[20px] bg-marva-700 px-4 py-4 font-semibold text-white disabled:opacity-60"
-            >
-              {loading ? "Yuborilmoqda..." : "Buyurtmani yuborish"}
-            </button>
+<div className="fixed bottom-24 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-[20px] bg-marva-700 px-4 py-4 font-semibold text-white shadow-lg disabled:opacity-60"
+              >
+                {loading ? "Yuborilmoqda..." : "Buyurtmani yuborish"}
+              </button>
+            </div>
           </form>
         )}
       </Container>

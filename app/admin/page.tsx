@@ -1,68 +1,220 @@
 "use client";
 
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { BottomNav } from "@/components/layout/BottomNav";
-import { Container } from "@/components/ui/Container";
-import { Package, ClipboardList, Users } from "lucide-react";
+import { ArrowLeft, Package, ShoppingBag, Users, Megaphone } from "lucide-react";
+
+const cards = [
+  {
+    title: "Buyurtmalar",
+    desc: "Tushgan zakazlar, status va dostavka",
+    href: "/admin/orders",
+    icon: ShoppingBag,
+  },
+    {
+  title: "Reels",
+  desc: "Reels videolarini qo'shish, yoqish va o'chirish",
+  href: "/admin/reels",
+  icon: Megaphone,
+},
+  {
+    title: "Mahsulotlar",
+    desc: "Mahsulot qo'shish, edit va o'chirish",
+    href: "/admin/products",
+    icon: Package,
+  },
+  {
+    title: "Bannerlar",
+    desc: "Home promo, aksiya va reklama bloklari",
+    href: "/admin/banners",
+    icon: Megaphone,
+  },
+  {
+    title: "Mijozlar",
+    desc: "Ro'yxatdan o'tgan foydalanuvchilar bazasi",
+    href: "/admin/customers",
+    icon: Users,
+  },
+
+];
 
 export default function AdminPage() {
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-28">
-      <Header />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#eef3f1",
+        fontFamily: "'Segoe UI', sans-serif",
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          borderBottom: "1px solid #e5ece9",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "480px",
+            margin: "0 auto",
+            padding: "18px 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Link
+            href="/"
+            style={{
+              width: "44px",
+              height: "44px",
+              borderRadius: "999px",
+              background: "#f3f7f6",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#12332d",
+              textDecoration: "none",
+            }}
+          >
+            <ArrowLeft size={20} />
+          </Link>
 
-      <Container className="py-5 space-y-5">
-        <div className="rounded-[32px] bg-white p-5 shadow-soft">
-          <p className="text-sm text-marva-700/70">Admin panel</p>
-          <h1 className="mt-1 text-2xl font-bold text-marva-900">
+          <div
+            style={{
+              fontSize: "18px",
+              fontWeight: 700,
+              color: "#12332d",
+            }}
+          >
+            Admin
+          </div>
+
+          <div style={{ width: "44px", height: "44px" }} />
+        </div>
+      </div>
+
+      <div
+        style={{
+          maxWidth: "480px",
+          margin: "0 auto",
+          padding: "18px 16px 110px",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            borderRadius: "28px",
+            padding: "18px",
+            boxShadow: "0 16px 40px rgba(15,23,42,0.06)",
+            border: "1px solid rgba(15,23,42,0.04)",
+            marginBottom: "16px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "14px",
+              color: "#4f8c84",
+              marginBottom: "8px",
+            }}
+          >
+            Admin panel
+          </div>
+
+          <div
+            style={{
+              fontSize: "24px",
+              fontWeight: 800,
+              color: "#12332d",
+              lineHeight: 1.15,
+              marginBottom: "10px",
+            }}
+          >
             Boshqaruv bo'limi
-          </h1>
-          <p className="mt-2 text-sm text-marva-700/75">
-            Mahsulotlar, buyurtmalar va mijozlar bazasi
-          </p>
+          </div>
+
+          <div
+            style={{
+              fontSize: "15px",
+              color: "#5d7e78",
+              lineHeight: 1.5,
+            }}
+          >
+            Mahsulotlar, bannerlar, buyurtmalar va mijozlar bazasi
+          </div>
         </div>
 
-        <Link
-          href="/admin/orders"
-          className="block rounded-[28px] bg-white p-5 shadow-soft"
+        <div
+          style={{
+            display: "grid",
+            gap: "16px",
+          }}
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-marva-50 text-marva-700">
-            <ClipboardList size={22} />
-          </div>
-          <h2 className="mt-4 text-xl font-bold text-marva-900">Buyurtmalar</h2>
-          <p className="mt-2 text-sm text-marva-700/75">
-            Tushgan zakazlar, status va dostavka
-          </p>
-        </Link>
+          {cards.map((card) => {
+            const Icon = card.icon;
 
-        <Link
-          href="/admin/products"
-          className="block rounded-[28px] bg-white p-5 shadow-soft"
-        >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-marva-50 text-marva-700">
-            <Package size={22} />
-          </div>
-          <h2 className="mt-4 text-xl font-bold text-marva-900">Mahsulotlar</h2>
-          <p className="mt-2 text-sm text-marva-700/75">
-            Mahsulot qo'shish, edit va o'chirish
-          </p>
-        </Link>
+            return (
+              <Link
+                key={card.title}
+                href={card.href}
+                style={{
+                  textDecoration: "none",
+                }}
+              >
+                <div
+                  style={{
+                    background: "white",
+                    borderRadius: "28px",
+                    padding: "18px",
+                    boxShadow: "0 14px 34px rgba(15,23,42,0.06)",
+                    border: "1px solid rgba(15,23,42,0.04)",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "46px",
+                      height: "46px",
+                      borderRadius: "18px",
+                      background: "#f3f7f6",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#0b5d52",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <Icon size={22} />
+                  </div>
 
-        <Link
-          href="/admin/customers"
-          className="block rounded-[28px] bg-white p-5 shadow-soft"
-        >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-marva-50 text-marva-700">
-            <Users size={22} />
-          </div>
-          <h2 className="mt-4 text-xl font-bold text-marva-900">Mijozlar</h2>
-          <p className="mt-2 text-sm text-marva-700/75">
-            Ro'yxatdan o'tgan foydalanuvchilar bazasi
-          </p>
-        </Link>
-      </Container>
+                  <div
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: 800,
+                      color: "#12332d",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    {card.title}
+                  </div>
 
-      <BottomNav />
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      color: "#5d7e78",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {card.desc}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

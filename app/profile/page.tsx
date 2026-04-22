@@ -2,20 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/layout/Header";
+import { useAppLang } from "@/components/common/LangProvider";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
 import {
+  ArrowLeft,
   User,
-  Phone,
+  Package,
+  Heart,
+  Eye,
   MapPin,
-  Send,
-  ShieldCheck,
+  ChevronRight,
   LogOut,
-  Calendar,
-  Users,
-  Building2,
-  Hash,
 } from "lucide-react";
 
 type SavedUser = {
@@ -30,39 +28,65 @@ type SavedUser = {
   clinicName?: string | null;
 };
 
-function getGenderLabel(value?: string | null) {
-  if (!value) return "Kiritilmagan";
-  if (value === "male") return "Erkak";
-  if (value === "female") return "Ayol";
-  // Eski ma'lumotlar uchun fallback
-  if (value === "Erkak") return "Erkak";
-  if (value === "Ayol") return "Ayol";
-  return value;
+type MenuItemProps = {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  value?: string | number;
+  onClick?: () => void;
+};
+
+function MenuItem({ icon, title, subtitle, value, onClick }: MenuItemProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-4 text-left transition active:scale-[0.99]"
+    >
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F4F6F7] text-[#4B5563]">
+        {icon}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="text-[18px] font-semibold leading-6 text-[#111827]">
+          {title}
+        </div>
+        {subtitle ? (
+          <div className="mt-1 text-sm text-[#9CA3AF]">{subtitle}</div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center gap-2">
+        {value !== undefined ? (
+          <span className="text-[18px] font-medium text-[#111827]">
+            {value}
+          </span>
+        ) : null}
+        <ChevronRight size={20} className="text-[#9CA3AF]" />
+      </div>
+    </button>
+  );
 }
 
-function getCustomerTypeLabel(value?: string | null) {
-  if (!value) return "Kiritilmagan";
-
-  const map: Record<string, string> = {
-    // Yangi inglizcha kalitlar
-    dentist: "Stomatolog",
-    clinic_staff: "Klinika xodimi",
-    clinic_owner: "Klinika egasi",
-    company_representative: "Kompaniya vakili",
-    regular_customer: "Oddiy mijoz",
-    // Eski o'zbekcha qiymatlar uchun fallback
-    Stomatolog: "Stomatolog",
-    "Klinika xodimi": "Klinika xodimi",
-    "Klinika egasi": "Klinika egasi",
-    "Kompaniya vakili": "Kompaniya vakili",
-    "Oddiy mijoz": "Oddiy mijoz",
-  };
-
-  return map[value] || value;
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[28px] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
+      <div className="px-5 pb-2 pt-5 text-[15px] font-extrabold uppercase tracking-[0.08em] text-[#4B5563]">
+        {title}
+      </div>
+      <div className="divide-y divide-[#EEF2F3]">{children}</div>
+    </div>
+  );
 }
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { lang, mounted } = useAppLang();
   const [user, setUser] = useState<SavedUser | null>(null);
 
   useEffect(() => {
@@ -86,176 +110,127 @@ export default function ProfilePage() {
     router.push("/auth");
   };
 
+  if (!mounted) return null;
+
   if (!user) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)]">
-        <Header />
-        <Container className="py-10">
-          <div className="rounded-[32px] bg-white/95 p-6 text-center shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
-            <p className="text-sm text-[#5D7E78]">Yuklanmoqda...</p>
+      <div className="min-h-screen bg-[#F3F6F5] pb-28">
+        <div className="sticky top-0 z-40 border-b border-black/5 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex h-20 max-w-md items-center justify-between px-4">
+            <button
+              onClick={() => router.back()}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]"
+            >
+              <ArrowLeft size={22} />
+            </button>
+
+            <div className="text-[20px] font-bold text-[#12332D]">
+              {lang === "uz" ? "Profil" : "Профиль"}
+            </div>
+
+            <div className="h-12 w-12" />
+          </div>
+        </div>
+
+        <Container className="py-6">
+          <div className="rounded-[28px] bg-white p-5 text-center text-sm text-[#6B7280] shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
+            {lang === "uz" ? "Yuklanmoqda..." : "Загрузка..."}
           </div>
         </Container>
+
         <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-28">
-      <Header />
-
-      <Container className="py-5 space-y-5">
-        <div className="overflow-hidden rounded-[32px] bg-white/95 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
-          <div className="bg-[#004F45] px-5 pb-6 pt-5 text-white">
-            <p className="text-sm text-white/75">Profil</p>
-            <h1 className="mt-1 text-[28px] font-bold leading-9">
-              {user.fullName || "Foydalanuvchi"}
-            </h1>
-            <p className="mt-2 text-sm text-white/80">
-              {user.telegramUsername || "@username_mavjud_emas"}
-            </p>
-
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium">
-              <ShieldCheck size={16} />
-              Ro'yxatdan o'tgan foydalanuvchi
-            </div>
-          </div>
-
-          <div className="space-y-3 p-5">
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <User size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Ism</p>
-                <p className="font-semibold text-[#12332D]">{user.fullName}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <Phone size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Telefon</p>
-                <p className="font-semibold text-[#12332D]">{user.phone}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <MapPin size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Manzil</p>
-                <p className="font-semibold text-[#12332D]">
-                  {user.address || "Manzil kiritilmagan"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <Calendar size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Yosh</p>
-                <p className="font-semibold text-[#12332D]">
-                  {user.age || "Kiritilmagan"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <Users size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Jins</p>
-                <p className="font-semibold text-[#12332D]">
-                  {getGenderLabel(user.gender)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <Hash size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Kimligi</p>
-                <p className="font-semibold text-[#12332D]">
-                  {getCustomerTypeLabel(user.customerType)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <Building2 size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Klinika / kompaniya</p>
-                <p className="font-semibold text-[#12332D]">
-                  {user.clinicName || "Kiritilmagan"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <Send size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Telegram</p>
-                <p className="font-semibold text-[#12332D]">
-                  {user.telegramUsername || "@username_mavjud_emas"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF3F1] text-[#004F45]">
-                <Hash size={20} />
-              </div>
-              <div>
-                <p className="text-xs text-[#5D7E78]">Telegram ID</p>
-                <p className="font-semibold text-[#12332D]">
-                  {user.telegramId || "Mavjud emas"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[32px] bg-white/95 p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
-          <h2 className="text-xl font-bold text-[#12332D]">Kontaktlar</h2>
-
-          <div className="mt-4 space-y-3">
-            <div className="rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <p className="text-xs text-[#5D7E78]">Telefon 1</p>
-              <p className="mt-1 font-semibold text-[#12332D]">+998 99 411 30 20</p>
-            </div>
-
-            <div className="rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <p className="text-xs text-[#5D7E78]">Telefon 2</p>
-              <p className="mt-1 font-semibold text-[#12332D]">+998 55 514 80 80</p>
-            </div>
-
-            <div className="rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <p className="text-xs text-[#5D7E78]">Telegram</p>
-              <p className="mt-1 font-semibold text-[#12332D]">@marva_dental_shop</p>
-            </div>
-          </div>
-
+    <div className="min-h-screen bg-[#F3F6F5] pb-28">
+      <div className="sticky top-0 z-40 border-b border-black/5 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex h-20 max-w-md items-center justify-between px-4">
           <button
-            onClick={handleLogout}
-            className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#004F45] text-base font-semibold text-white shadow-[0_14px_28px_rgba(0,79,69,0.22)] ring-1 ring-white/10"
+            onClick={() => router.back()}
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]"
           >
-            <LogOut size={20} />
-            Chiqish
+            <ArrowLeft size={22} />
+          </button>
+
+          <div className="text-[20px] font-bold text-[#12332D]">
+            {lang === "uz" ? "Profil" : "Профиль"}
+          </div>
+
+          <div className="h-12 w-12" />
+        </div>
+      </div>
+
+      <Container className="space-y-4 py-4">
+        <div className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
+          <button
+            onClick={() => router.push("/profile/edit")}
+            className="flex w-full items-center gap-4 text-left"
+          >
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#EC4899_0%,#8B5CF6_100%)] p-[2px]">
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-[#9CA3AF]">
+                <User size={34} />
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="text-[20px] font-bold text-[#111827]">
+                {user.fullName || (lang === "uz" ? "Foydalanuvchi" : "Пользователь")}
+              </div>
+              <div className="mt-1 text-[17px] text-[#9CA3AF]">
+                {user.phone || (lang === "uz" ? "Telefon yo‘q" : "Нет телефона")}
+              </div>
+            </div>
+
+            <ChevronRight size={24} className="text-[#9CA3AF]" />
           </button>
         </div>
+
+        <SectionCard title={lang === "uz" ? "Xaridlar" : "Покупки"}>
+          <MenuItem
+            icon={<Package size={24} />}
+            title={lang === "uz" ? "Buyurtmalarim" : "Мои заказы"}
+            value={0}
+            onClick={() => router.push("/orders")}
+          />
+
+          <MenuItem
+            icon={<Heart size={24} />}
+            title={lang === "uz" ? "Sevimlilar" : "Избранное"}
+            onClick={() => router.push("/favorites")}
+          />
+
+          <MenuItem
+            icon={<Eye size={24} />}
+            title={lang === "uz" ? "Ko‘rilgan mahsulotlar" : "Просмотренные товары"}
+            onClick={() => router.push("/viewed")}
+          />
+        </SectionCard>
+
+        <SectionCard title={lang === "uz" ? "Shaxsiy kabinet" : "Личный кабинет"}>
+          <MenuItem
+            icon={<User size={24} />}
+            title={lang === "uz" ? "Profilim" : "Мой профиль"}
+            subtitle={user.telegramUsername || (lang === "uz" ? "@username_mavjud_emas" : "@username_не_указан")}
+            onClick={() => router.push("/profile/edit")}
+          />
+
+          <MenuItem
+            icon={<MapPin size={24} />}
+            title={lang === "uz" ? "Manzillarim" : "Мои адреса"}
+            subtitle={user.address || (lang === "uz" ? "Manzil kiritilmagan" : "Адрес не указан")}
+            onClick={() => router.push("/addresses")}
+          />
+        </SectionCard>
+
+        <button
+          onClick={handleLogout}
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#004F45] text-base font-semibold text-white shadow-[0_14px_28px_rgba(0,79,69,0.22)]"
+        >
+          <LogOut size={20} />
+          {lang === "uz" ? "Chiqish" : "Выйти"}
+        </button>
       </Container>
 
       <BottomNav />

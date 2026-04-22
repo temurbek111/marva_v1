@@ -1,204 +1,220 @@
-"use client";
-
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Header } from "@/components/layout/Header";
-import { BottomNav } from "@/components/layout/BottomNav";
-import { Container } from "@/components/ui/Container";
-import { ProductCard } from "@/components/product/ProductCard";
+import Link from "next/link";
+import { ArrowLeft, Search } from "lucide-react";
+import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
-import type { Category, Product } from "@/lib/types";
+import { Container } from "@/components/ui/Container";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { ProductCard } from "@/components/product/ProductCard";
+import { CatalogFilters } from "./CatalogFilters";
 
-type DbCategory = {
-  id: number;
-  name: string;
-  slug: string;
+const PAGE_SIZE = 24;
+
+type UseCategory =
+  | "all"
+  | "terapiya"
+  | "endodontiya"
+  | "ortopediya"
+  | "jarrohlik"
+  | "gigiyena"
+  | "uskunalar"
+  | "umumiy";
+
+type PageProps = {
+  searchParams: Promise<{ use?: string; q?: string; page?: string }>;
 };
 
-type DbProduct = {
-  id: number;
-  name: string;
-  price: number;
-  image_url: string | null;
-  stock: number;
-  category_id: number | null;
-  description?: string | null;
-};
+async function getProducts(
+  useCategory: string,
+  searchQuery: string,
+  page: number
+) {
+  if (!supabase) return { products: [], total: 0 };
 
-function CatalogContent() {
-  const searchParams = useSearchParams();
-  const category = searchParams.get("category") || "";
-  const q = searchParams.get("q")?.toLowerCase().trim() || "";
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  let query = supabase
+    .from("products")
+    .select(
+      "id, name, price, old_price, images, image_url, use_category, stock, is_featured, category_id, description",
+      { count: "exact" }
+    )
+    .eq("is_active", true)
+    .gt("stock", 0)
+    .order("id", { ascending: false })
+    .range(from, to);
 
-  async function loadCatalog() {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-
-    const { data: categoriesData, error: categoriesError } = await supabase
-      .from("categories")
-      .select("id,name,slug")
-      .order("id", { ascending: true });
-
-    const { data: productsData, error: productsError } = await supabase
-      .from("products")
-      .select("id,name,price,image_url,stock,category_id,description,is_active")
-      .eq("is_active", true)
-      .order("id", { ascending: false });
-
-    if (categoriesError) console.error(categoriesError);
-    if (productsError) console.error(productsError);
-
-    const mappedCategories: Category[] = (categoriesData || []).map(
-      (item: DbCategory) => ({
-        id: String(item.id),
-        name: item.name,
-        slug: item.slug,
-        icon: "box",
-        description: item.name,
-      })
-    );
-
-    const mappedProducts: Product[] = (productsData || []).map((item: any) => ({
-      id: String(item.id),
-      slug: `product-${item.id}`,
-      categoryId: item.category_id ? String(item.category_id) : "",
-      name: item.name,
-      price: Number(item.price || 0),
-      currency: "USD",
-      image: item.image_url || "",
-      shortDescription: item.description || "Dental mahsulot",
-      description: item.description || "Dental mahsulot",
-      stock: item.stock || 0,
-      featured: false,
-    }));
-
-    setCategories(mappedCategories);
-    setProducts(mappedProducts);
-    setLoading(false);
+  if (useCategory !== "all") {
+    query = query.eq("use_category", useCategory);
   }
 
-  useEffect(() => {
-    loadCatalog();
-  }, []);
+  if (searchQuery) {
+    query = query.ilike("name", `%${searchQuery}%`);
+  }
 
-  const filtered = useMemo(() => {
-    let result = [...products];
+  const { data, error, count } = await query;
 
-    if (category) {
-      result = result.filter((product) => {
-        const cat = categories.find((item) => item.id === product.categoryId);
-        return cat?.slug === category;
-      });
-    }
+  if (error) {
+    console.error("Catalog fetch error:", error.message);
+    return { products: [], total: 0 };
+  }
 
-    if (q) {
-      result = result.filter((product) => {
-        const name = product.name?.toLowerCase() || "";
-        const description = product.description?.toLowerCase() || "";
-        const shortDescription = product.shortDescription?.toLowerCase() || "";
-        return (
-          name.includes(q) ||
-          description.includes(q) ||
-          shortDescription.includes(q)
-        );
-      });
-    }
-
-    return result;
-  }, [category, q, categories, products]);
-
-  return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-28">
-      <Header />
-
-      <Container className="py-5">
-        <div className="rounded-[32px] bg-white/95 p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5 backdrop-blur">
-          <h2 className="text-2xl font-bold text-[#12332D]">Katalog</h2>
-          <p className="mt-1 text-sm text-[#5D7E78]">
-            Mahsulotlar, narxlar va kategoriyalar
-          </p>
-
-          {q ? (
-            <p className="mt-2 text-sm text-[#004F45]">
-              Qidiruv: <span className="font-semibold">{q}</span>
-            </p>
-          ) : null}
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <a
-              href={q ? `/catalog?q=${encodeURIComponent(q)}` : "/catalog"}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                !category
-                  ? "bg-[#004F45] text-white shadow-[0_10px_20px_rgba(0,79,69,0.18)]"
-                  : "bg-[#F4F7F6] text-[#12332D] ring-1 ring-black/5"
-              }`}
-            >
-              Barchasi
-            </a>
-
-            {categories.map((item) => (
-              <a
-                key={item.id}
-                href={
-                  q
-                    ? `/catalog?category=${item.slug}&q=${encodeURIComponent(q)}`
-                    : `/catalog?category=${item.slug}`
-                }
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  category === item.slug
-                    ? "bg-[#004F45] text-white shadow-[0_10px_20px_rgba(0,79,69,0.18)]"
-                    : "bg-[#F4F7F6] text-[#12332D] ring-1 ring-black/5"
-                }`}
-              >
-                {item.name}
-              </a>
-            ))}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="mt-5 rounded-[28px] bg-white p-6 text-center shadow-soft">
-            Yuklanmoqda...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="mt-5 rounded-[28px] bg-white p-6 text-center shadow-soft">
-            Hech narsa topilmadi
-          </div>
-        ) : (
-          <div className="mt-5 grid grid-cols-2 gap-4">
-            {filtered.map((product) => (
-              <div
-                key={product.id}
-                className="rounded-[28px] bg-white/95 p-2 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-black/5"
-              >
-                <ProductCard product={product} />
-              </div>
-            ))}
-          </div>
-        )}
-      </Container>
-
-      <BottomNav />
-    </div>
-  );
+  return { products: data ?? [], total: count ?? 0 };
 }
 
-export default function CatalogPage() {
+export default async function CatalogPage({ searchParams }: PageProps) {
+  const resolvedParams = await searchParams;
+  const useCategory = (resolvedParams.use || "all") as UseCategory;
+  const searchQuery = resolvedParams.q?.trim() || "";
+  const page = Math.max(1, parseInt(resolvedParams.page || "1"));
+
+  const cookieStore = await cookies();
+  const lang = cookieStore.get("lang")?.value === "ru" ? "ru" : "uz";
+
+  const { products, total } = await getProducts(useCategory, searchQuery, page);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const t = {
+    catalog:  lang === "uz" ? "Katalog"                                     : "Каталог",
+    found:    lang === "uz" ? `${total} ta mahsulot topildi`                : `Найдено: ${total}`,
+    products: lang === "uz" ? "Mahsulotlar"                                 : "Товары",
+    subtitle: lang === "uz" ? "Tanlangan filtrlar bo'yicha"                 : "По выбранным фильтрам",
+    notfound: lang === "uz" ? "Mahsulot topilmadi"                          : "Товар не найден",
+    tryother: lang === "uz" ? "Boshqa filter yoki qidiruvni sinab ko'ring"  : "Попробуйте другой фильтр",
+    search:   lang === "uz" ? "Mahsulotlarni qidiring"                      : "Поиск товаров",
+    prev:     lang === "uz" ? "← Oldingi"                                   : "← Назад",
+    next:     lang === "uz" ? "Keyingi →"                                   : "Вперёд →",
+    count:    lang === "uz" ? `${total} ta`                                 : `${total} шт.`,
+  };
+
+  const buildHref = (params: Record<string, string>) => {
+    const p = new URLSearchParams(params);
+    const s = p.toString();
+    return s ? `/catalog?${s}` : "/catalog";
+  };
+
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#F7FAF9]">
-          <p className="text-[#5D7E78]">Yuklanmoqda...</p>
+    <div className="min-h-screen bg-[#EEF3F1] pb-28">
+      <Container className="py-4">
+
+        {/* Header */}
+        <div className="rounded-[28px] bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-white text-[#12332D] shadow-[0_10px_25px_rgba(15,23,42,0.06)] ring-1 ring-black/5"
+            >
+              <ArrowLeft size={22} />
+            </Link>
+
+            <form action="/catalog" method="GET" className="flex flex-1 items-center gap-3">
+              {useCategory !== "all" && (
+                <input type="hidden" name="use" value={useCategory} />
+              )}
+              <div className="flex min-h-[56px] flex-1 items-center gap-3 rounded-[18px] bg-[#F4F7F6] px-4">
+                <Search size={20} className="text-[#6D8781]" />
+                <input
+                  type="text"
+                  name="q"
+                  defaultValue={searchQuery}
+                  placeholder={t.search}
+                  className="w-full bg-transparent text-[15px] text-[#12332D] outline-none placeholder:text-[#6D8781]"
+                />
+              </div>
+            </form>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-sm text-[#6D8781]">MARVA Dental market</p>
+            <h1 className="mt-1 text-[30px] font-bold text-[#12332D]">{t.catalog}</h1>
+            <p className="mt-1 text-sm text-[#5D7E78]">{t.found}</p>
+          </div>
         </div>
-      }
-    >
-      <CatalogContent />
-    </Suspense>
+
+        {/* Filters — client component */}
+        <CatalogFilters
+          activeUse={useCategory}
+          searchQuery={searchQuery}
+          lang={lang}
+        />
+
+        {/* Products */}
+        <div className="mt-6 rounded-[28px] bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-[22px] font-bold text-[#12332D]">{t.products}</h3>
+              <p className="mt-1 text-sm text-[#5D7E78]">{t.subtitle}</p>
+            </div>
+            <div className="rounded-full bg-[#F4F7F6] px-3 py-2 text-xs font-semibold text-[#12332D]">
+              {t.count}
+            </div>
+          </div>
+
+          {products.length === 0 ? (
+            <div className="mt-5 rounded-[22px] bg-[#F8FBFA] p-6 text-center">
+              <p className="text-base font-semibold text-[#12332D]">{t.notfound}</p>
+              <p className="mt-2 text-sm text-[#5D7E78]">{t.tryother}</p>
+            </div>
+          ) : (
+            <div className="mt-5 grid grid-cols-2 gap-4">
+              {products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={{
+                    id: String(product.id),
+                    slug: `product-${product.id}`,
+                    categoryId: product.category_id ? String(product.category_id) : "",
+                    name: product.name || "Nomsiz mahsulot",
+                    price: Number(product.price || 0),
+                    oldPrice: product.old_price ? Number(product.old_price) : undefined,
+                    currency: "USD",
+                    image: product.images?.[0] || product.image_url || "",
+                    shortDescription: product.description || "Dental mahsulot",
+                    description: product.description || "Dental mahsulot",
+                    stock: Number(product.stock || 0),
+                    featured: Boolean(product.is_featured),
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-3">
+              {page > 1 && (
+                <Link
+                  href={buildHref({
+                    ...(useCategory !== "all" ? { use: useCategory } : {}),
+                    ...(searchQuery ? { q: searchQuery } : {}),
+                    page: String(page - 1),
+                  })}
+                  className="rounded-full bg-[#F8FBFA] px-4 py-2 text-sm font-semibold text-[#12332D] ring-1 ring-black/5"
+                >
+                  {t.prev}
+                </Link>
+              )}
+              <span className="rounded-full bg-[#004F45] px-4 py-2 text-sm font-semibold text-white">
+                {page} / {totalPages}
+              </span>
+              {page < totalPages && (
+                <Link
+                  href={buildHref({
+                    ...(useCategory !== "all" ? { use: useCategory } : {}),
+                    ...(searchQuery ? { q: searchQuery } : {}),
+                    page: String(page + 1),
+                  })}
+                  className="rounded-full bg-[#F8FBFA] px-4 py-2 text-sm font-semibold text-[#12332D] ring-1 ring-black/5"
+                >
+                  {t.next}
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+
+      </Container>
+      <BottomNav />
+    </div>
   );
 }

@@ -1,0 +1,111 @@
+{
+  "users": {
+    "200785865": {
+      "telegramId": 200785865,
+      "telegramUsername": "@Otabek_milliarder",
+      "fullName": "Otabek ergashov",
+      "phone": "+998977299191",
+      "address": "toshkent'",
+      "createdAt": "2026-03-26T11:06:57.649Z",
+      "customerId": 9
+    },
+    "776649839": {
+      "telegramId": 776649839,
+      "telegramUsername": "@MarvaDental_Education",
+      "fullName": "Mohinur",
+      "phone": "+998990376300",
+      "address": "xfjfvhj",
+      "createdAt": "2026-03-26T07:43:43.876Z",
+      "customerId": null
+    },
+    "970926285": {
+      "telegramId": 970926285,
+      "telegramUsername": "@RIZAYEV_SALOHIDDIN",
+      "fullName": "Sam",
+      "phone": "+998958882527",
+      "address": "844",
+      "createdAt": "2026-03-26T08:19:15.852Z",
+      "customerId": null
+    },
+    "8186256538": {
+      "telegramId": 8186256538,
+      "telegramUsername": "@Ergawev_tech_work",
+      "fullName": "Otabek ergashov",
+      "phone": "+998951327557",
+      "address": "toshkent shahar shayxontoxur tumani",
+      "createdAt": "2026-03-25T18:55:40.605Z"
+    }
+  },
+  "orderRequests": [
+    {
+      "id": "BOT-1774523356277",
+      "createdAt": "2026-03-26T11:09:16.277Z",
+      "source": "telegram_bot",
+      "chatId": "200785865",
+      "telegramId": 200785865,
+      "telegramUsername": "@Otabek_milliarder",
+      "fullName": "Otabek ergashov",
+      "phone": "+998977299191",
+      "productName": "☎️ Operator bilan bog'lanish",
+      "quantity": "📘 Mahsulot haqida ma'lumot",
+      "address": "👤 Profilim",
+      "status": "new"
+    },
+    {
+      "id": "BOT-1774511125100",
+      "createdAt": "2026-03-26T07:45:25.100Z",
+      "source": "telegram_bot",
+      "chatId": "776649839",
+      "telegramId": 776649839,
+      "telegramUsername": "@MarvaDental_Education",
+      "fullName": "Mohinur",
+      "phone": "+998990376300",
+      "productName": "• Septodont — $5",
+      "quantity": "15",
+      "address": "Marva Academy",
+      "status": "new"
+    },
+    {
+      "id": "BOT-1774466476997",
+      "createdAt": "2026-03-25T19:21:16.997Z",
+      "source": "telegram_bot",
+      "chatId": "8186256538",
+      "telegramId": 8186256538,
+      "telegramUsername": "@Ergawev_tech_work",
+      "fullName": "Otabek ergashov",
+      "phone": "+998951327557",
+      "productName": "plombalar haqida ma'lumot bering avval",
+      "quantity": "📘 Mahsulot haqida ma'lumot",
+      "address": "📘 Mahsulot haqida ma'lumot",
+      "status": "new"
+    },
+    {
+      "id": "BOT-1774465002302",
+      "createdAt": "2026-03-25T18:56:42.302Z",
+      "source": "telegram_bot",
+      "chatId": "8186256538",
+      "telegramId": 8186256538,
+      "telegramUsername": "@Ergawev_tech_work",
+      "fullName": "Otabek ergashov",
+      "phone": "+998951327557",
+      "productName": "❓ Savol berish",
+      "quantity": "❓ Savol berish",
+      "address": "❓ Savol berish",
+      "status": "new"
+    },
+    {
+      "id": "BOT-1774464977684",
+      "createdAt": "2026-03-25T18:56:17.684Z",
+      "source": "telegram_bot",
+      "chatId": "8186256538",
+      "telegramId": 8186256538,
+      "telegramUsername": "@Ergawev_tech_work",
+      "fullName": "Otabek ergashov",
+      "phone": "+998951327557",
+      "productName": "plomba kerak",
+      "quantity": "2",
+      "address": "toshkent shahar shayxoontoxur tumani",
+      "status": "new"
+    }
+  ]
+}
