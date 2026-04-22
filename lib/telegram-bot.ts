@@ -1,3 +1,34 @@
+export type TelegramOrderItem = {
+  product_name?: string;
+  quantity?: number;
+  price?: number | string;
+};
+
+export type TelegramOrderPayload = {
+  orderId: string;
+  fullName?: string;
+  phone?: string;
+  address?: string;
+  note?: string;
+  totalAmount?: number | string;
+  items: TelegramOrderItem[];
+  moyskladOrderName?: string;
+  updatedStock?: number | null;
+};
+
+function buildItemsText(items: TelegramOrderItem[]) {
+  if (!items.length) return "Mahsulotlar yo‘q";
+
+  return items
+    .map((item, index) => {
+      const name = item.product_name || "Nomsiz mahsulot";
+      const quantity = Number(item.quantity ?? 0);
+      const price = item.price ?? 0;
+      return `${index + 1}. ${name} — ${quantity} dona — ${price}`;
+    })
+    .join("\n");
+}
+
 export async function telegramBot(
   method: string,
   body: Record<string, unknown>
@@ -26,27 +57,34 @@ export async function telegramBot(
   return data;
 }
 
-export async function sendOrderToTelegram(order: {
-  id: number | string;
-  customer_name?: string;
-  phone?: string;
-  address?: string;
-  total?: number | string;
-}) {
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+export async function sendTelegramAdminOrder(params: TelegramOrderPayload) {
+  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
 
   if (!chatId) {
-    throw new Error("TELEGRAM_CHAT_ID topilmadi");
+    throw new Error("TELEGRAM_ADMIN_CHAT_ID topilmadi");
   }
 
+  const itemsText = buildItemsText(params.items);
+
   const text = [
-    "🆕 Yangi buyurtma",
-    `ID: #${order.id}`,
-    `Mijoz: ${order.customer_name || "-"}`,
-    `Telefon: ${order.phone || "-"}`,
-    `Manzil: ${order.address || "-"}`,
-    `Jami: ${order.total || "-"}`,
-  ].join("\n");
+    "🦷 Yangi buyurtma (Admin)",
+    "",
+    `Order ID: #${params.orderId}`,
+    `Mijoz: ${params.fullName || "-"}`,
+    `Telefon: ${params.phone || "-"}`,
+    `Manzil: ${params.address || "-"}`,
+    `Izoh: ${params.note || "-"}`,
+    `Jami: ${params.totalAmount || "-"}`,
+    `MoySklad order: ${params.moyskladOrderName || "-"}`,
+    params.updatedStock !== null && params.updatedStock !== undefined
+      ? `Yangilangan qoldiq: ${params.updatedStock}`
+      : null,
+    "",
+    "Mahsulotlar:",
+    itemsText,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   return telegramBot("sendMessage", {
     chat_id: chatId,
@@ -54,8 +92,14 @@ export async function sendOrderToTelegram(order: {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "✅ Qabul qilish", callback_data: `accept:${order.id}` },
-          { text: "❌ Bekor qilish", callback_data: `cancel:${order.id}` },
+          {
+            text: "✅ Qabul qilish",
+            callback_data: `accept:${params.orderId}`,
+          },
+          {
+            text: "❌ Bekor qilish",
+            callback_data: `cancel:${params.orderId}`,
+          },
         ],
       ],
     },

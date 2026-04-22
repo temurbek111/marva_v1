@@ -1,31 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { telegramBot } from "@/lib/telegram-bot";
 
 export const runtime = "nodejs";
-
-async function telegram(method: string, body: Record<string, unknown>) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-
-  if (!token) {
-    throw new Error("TELEGRAM_BOT_TOKEN topilmadi");
-  }
-
-  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-
-  const data = await res.json();
-
-  if (!res.ok || !data?.ok) {
-    throw new Error(data?.description || `Telegram ${method} xatosi`);
-  }
-
-  return data;
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,17 +11,9 @@ export async function POST(req: NextRequest) {
     const callback = update.callback_query;
 
     if (message?.text === "/start") {
-      await telegram("sendMessage", {
+      await telegramBot("sendMessage", {
         chat_id: message.chat.id,
-        text: "Tanlang:",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "✅ Qabul qilish", callback_data: "accept:123" },
-              { text: "❌ Bekor qilish", callback_data: "cancel:123" },
-            ],
-          ],
-        },
+        text: "Bot ishladi ✅",
       });
 
       return NextResponse.json({ ok: true });
@@ -73,17 +41,21 @@ export async function POST(req: NextRequest) {
       text = `❌ Buyurtma bekor qilindi: #${orderId}`;
     }
 
-    await telegram("answerCallbackQuery", {
+    // Agar keyin status update qo‘shmoqchi bo‘lsangiz,
+    // shu yerda faqat order status ni o‘zgartiring.
+    // Quantity / stock ga tegmang.
+
+    await telegramBot("answerCallbackQuery", {
       callback_query_id: callback.id,
       text,
     });
 
-    await telegram("sendMessage", {
+    await telegramBot("sendMessage", {
       chat_id: chatId,
       text,
     });
 
-    await telegram("editMessageReplyMarkup", {
+    await telegramBot("editMessageReplyMarkup", {
       chat_id: chatId,
       message_id: messageId,
       reply_markup: {

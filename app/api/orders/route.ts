@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendTelegramAdminOrder } from "@/lib/telegram-bot";
 
 export const runtime = "nodejs";
 
@@ -24,8 +25,6 @@ const MOYSKLAD_BASE =
   process.env.MOYSKLAD_BASE_URL || "https://api.moysklad.ru/api/remap/1.2";
 
 const MOYSKLAD_TOKEN = process.env.MOYSKLAD_TOKEN;
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID;
 
 function getMoyskladHeaders() {
   if (!MOYSKLAD_TOKEN) {
@@ -55,20 +54,6 @@ function attachMoyskladIds(items: OrderItem[]): OrderItem[] {
     moysklad_product_id:
       item.moysklad_product_id || map[item.product_name || ""],
   }));
-}
-
-function buildItemsText(items: OrderItem[]) {
-  if (!items.length) return "Mahsulotlar yo‘q";
-
-  return items
-    .map((item, index) => {
-      const name = item.product_name || "Nomsiz mahsulot";
-      const quantity = Number(item.quantity ?? 0);
-      const price = item.price ?? 0;
-
-      return `${index + 1}. ${name} — ${quantity} dona — ${price}`;
-    })
-    .join("\n");
 }
 
 function buildMoyskladPositions(items: OrderItem[]) {
@@ -146,79 +131,6 @@ async function createMoyskladOrder(params: {
   return res.json();
 }
 
-async function sendTelegramOrderMessage(params: {
-  orderId: string;
-  fullName?: string;
-  phone?: string;
-  address?: string;
-  note?: string;
-  totalAmount?: number | string;
-  items: OrderItem[];
-  moyskladOrderName?: string;
-  updatedStock?: number | null;
-}) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) {
-    throw new Error("Telegram env topilmadi");
-  }
-
-  const itemsText = buildItemsText(params.items);
-
-  const text = [
-    "🦷 Yangi buyurtma (Admin)",
-    "",
-    `Order ID: #${params.orderId}`,
-    `Mijoz: ${params.fullName || "-"}`,
-    `Telefon: ${params.phone || "-"}`,
-    `Manzil: ${params.address || "-"}`,
-    `Izoh: ${params.note || "-"}`,
-    `Jami: ${params.totalAmount || "-"}`,
-    `MoySklad order: ${params.moyskladOrderName || "-"}`,
-    params.updatedStock !== null && params.updatedStock !== undefined
-      ? `Yangilangan qoldiq: ${params.updatedStock}`
-      : null,
-    "",
-    "Mahsulotlar:",
-    itemsText,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const telegramRes = await fetch(
-    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_ADMIN_CHAT_ID,
-        text,
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "✅ Qabul qilish",
-                callback_data: `accept:${params.orderId}`,
-              },
-              {
-                text: "❌ Bekor qilish",
-                callback_data: `cancel:${params.orderId}`,
-              },
-            ],
-          ],
-        },
-      }),
-      cache: "no-store",
-    }
-  );
-
-  const telegramData = await telegramRes.json();
-
-  if (!telegramRes.ok || !telegramData?.ok) {
-    throw new Error(telegramData?.description || "Telegramga yuborilmadi");
-  }
-
-  return telegramData;
-}
-
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as OrderRequestBody;
@@ -266,7 +178,7 @@ export async function POST(req: Request) {
       updatedStock = await getProductStock(firstMappedItem.moysklad_product_id);
     }
 
-    await sendTelegramOrderMessage({
+    await sendTelegramAdminOrder({
       orderId: String(orderId),
       fullName,
       phone,
