@@ -17,7 +17,6 @@ export const TEXTS = {
   "",
   "📞 Telefon: +998994113020",
   "📍 Manzil: Toshkent, Olmazor, Farobiy 94",
-  "🧭 Koordinata: 41.334880, 69.216837",
   "🕘 Ish vaqti: Du-Sha 9:00 - 18:00",
   "🚚 Yetkazib berish: Toshkent bo‘ylab mavjud",
 ].join("\n"),
