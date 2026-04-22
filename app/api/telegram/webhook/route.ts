@@ -160,25 +160,28 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-      if (text === getText(lang, "about")) {
-        await telegramBot("sendMessage", {
-          chat_id: chatId,
-          text: getText(lang, "contactText"),
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: "📍 Open map",
-                  url: "https://yandex.uz/maps/?ll=69.216837%2C41.334880&z=17&pt=69.216837,41.334880,pm2rdm",
-                },
-              ],
-              [{ text: getText(lang, "back"), callback_data: "menu:back" }],
-            ],
+if (text === getText(lang, "about")) {
+  await telegramBot("sendMessage", {
+    chat_id: chatId,
+    text: getText(lang, "contactText"),
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: "📍 Open map",
+            url: "https://yandex.uz/maps/?ll=69.216837%2C41.334880&z=17&pt=69.216837,41.334880,pm2rdm",
           },
-        });
+        ],
+        [{ text: getText(lang, "back"), callback_data: "menu:back" }],
+      ],
+    },
+  });
 
-        return NextResponse.json({ ok: true });
-      }
+  return NextResponse.json({ ok: true });
+}
+
+
+
 
       if (text === getText(lang, "language")) {
         await telegramBot("sendMessage", {

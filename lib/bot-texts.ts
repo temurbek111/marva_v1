@@ -12,14 +12,15 @@ export const TEXTS = {
     back: "⬅️ Orqaga",
     openCatalog: "🛒 Katalogni ochish",
     openMap: "📍 Xaritani ochish",
-    contactText: [
-      "🦷 Marva Dental",
-      "",
-      "📞 Telefon: +998994113020",
-      "📍 Manzil: Toshkent, Olmazor, Farobiy 94",
-      "🕘 Ish vaqti: Du-Sha 9:00 - 18:00",
-      "🚚 Yetkazib berish: Toshkent bo‘ylab mavjud",
-    ].join("\n"),
+   contactText: [
+  "🦷 Marva Dental",
+  "",
+  "📞 Telefon: +998994113020",
+  "📍 Manzil: Toshkent, Olmazor, Farobiy 94",
+  "🧭 Koordinata: 41.334880, 69.216837",
+  "🕘 Ish vaqti: Du-Sha 9:00 - 18:00",
+  "🚚 Yetkazib berish: Toshkent bo‘ylab mavjud",
+].join("\n"),
     operatorText:
       "Operator bilan bog‘lanish uchun shu yerga telefon raqamingiz yoki xabaringizni yuboring.",
     ordersEmpty: "Sizda hozircha buyurtmalar yo‘q.",
