@@ -19,8 +19,38 @@ function getUserLang(update: any): BotLang {
   return code.startsWith("ru") ? "ru" : "uz";
 }
 
+function logIncomingUpdate(update: any) {
+  console.log("TELEGRAM_UPDATE", {
+    update_id: update?.update_id,
+    update_type: update?.message
+      ? "message"
+      : update?.callback_query
+      ? "callback_query"
+      : "unknown",
+    chat_id:
+      update?.message?.chat?.id || update?.callback_query?.message?.chat?.id,
+    user_id: update?.message?.from?.id || update?.callback_query?.from?.id,
+    text: update?.message?.text || null,
+    callback_data: update?.callback_query?.data || null,
+    ts: new Date().toISOString(),
+  });
+}
+
+async function sendTelegram(method: string, payload: Record<string, any>) {
+  console.log("TELEGRAM_SEND", {
+    method,
+    chat_id: payload?.chat_id ?? null,
+    message_id: payload?.message_id ?? null,
+    text: payload?.text ?? null,
+    callback_query_id: payload?.callback_query_id ?? null,
+    ts: new Date().toISOString(),
+  });
+
+  return telegramBot(method, payload);
+}
+
 async function sendMainMenu(chatId: number, lang: BotLang) {
-  await telegramBot("sendMessage", {
+  await sendTelegram("sendMessage", {
     chat_id: chatId,
     text: getText(lang, "mainMenu"),
     reply_markup: mainMenuKeyboard(lang),
@@ -30,12 +60,13 @@ async function sendMainMenu(chatId: number, lang: BotLang) {
 export async function POST(req: NextRequest) {
   try {
     const update = await req.json();
+    logIncomingUpdate(update);
 
-    const message = update.message;
-    const callback = update.callback_query;
+    const message = update?.message;
+    const callback = update?.callback_query;
 
     if (message?.text === "/start") {
-      await telegramBot("sendMessage", {
+      await sendTelegram("sendMessage", {
         chat_id: message.chat.id,
         text: getText(getUserLang(update), "chooseLanguage"),
         reply_markup: languageKeyboard(),
@@ -57,7 +88,7 @@ export async function POST(req: NextRequest) {
       if (data === "lang:uz" || data === "lang:ru") {
         const selectedLang = data.split(":")[1] as BotLang;
 
-        await telegramBot("answerCallbackQuery", {
+        await sendTelegram("answerCallbackQuery", {
           callback_query_id: callback.id,
           text:
             selectedLang === "uz"
@@ -66,14 +97,14 @@ export async function POST(req: NextRequest) {
         });
 
         if (messageId) {
-          await telegramBot("editMessageText", {
+          await sendTelegram("editMessageText", {
             chat_id: chatId,
             message_id: messageId,
             text: getText(selectedLang, "mainMenu"),
           });
         }
 
-        await telegramBot("sendMessage", {
+        await sendTelegram("sendMessage", {
           chat_id: chatId,
           text: getText(selectedLang, "mainMenu"),
           reply_markup: mainMenuKeyboard(selectedLang),
@@ -83,7 +114,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (data === "menu:back") {
-        await telegramBot("answerCallbackQuery", {
+        await sendTelegram("answerCallbackQuery", {
           callback_query_id: callback.id,
         });
 
@@ -99,18 +130,18 @@ export async function POST(req: NextRequest) {
             ? `✅ Buyurtma qabul qilindi: #${orderId}`
             : `❌ Buyurtma bekor qilindi: #${orderId}`;
 
-        await telegramBot("answerCallbackQuery", {
+        await sendTelegram("answerCallbackQuery", {
           callback_query_id: callback.id,
           text,
         });
 
-        await telegramBot("sendMessage", {
+        await sendTelegram("sendMessage", {
           chat_id: chatId,
           text,
         });
 
         if (messageId) {
-          await telegramBot("editMessageReplyMarkup", {
+          await sendTelegram("editMessageReplyMarkup", {
             chat_id: chatId,
             message_id: messageId,
             reply_markup: {
@@ -131,7 +162,7 @@ export async function POST(req: NextRequest) {
       const text = String(message.text);
 
       if (text === getText(lang, "products")) {
-        await telegramBot("sendMessage", {
+        await sendTelegram("sendMessage", {
           chat_id: chatId,
           text: getText(lang, "products"),
           reply_markup: productsKeyboard(lang),
@@ -141,7 +172,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (text === getText(lang, "myOrders")) {
-        await telegramBot("sendMessage", {
+        await sendTelegram("sendMessage", {
           chat_id: chatId,
           text: getText(lang, "ordersEmpty"),
           reply_markup: backInlineKeyboard(lang),
@@ -151,7 +182,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (text === getText(lang, "callOperator")) {
-        await telegramBot("sendMessage", {
+        await sendTelegram("sendMessage", {
           chat_id: chatId,
           text: getText(lang, "operatorText"),
           reply_markup: backInlineKeyboard(lang),
@@ -160,31 +191,28 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-if (text === getText(lang, "about")) {
-  await telegramBot("sendMessage", {
-    chat_id: chatId,
-    text: getText(lang, "contactText"),
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "📍 Open map",
-            url: "https://yandex.uz/maps/?ll=69.216837%2C41.334880&z=17&pt=69.216837,41.334880,pm2rdm",
+      if (text === getText(lang, "about")) {
+        await sendTelegram("sendMessage", {
+          chat_id: chatId,
+          text: getText(lang, "contactText"),
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "📍 Open map",
+                  url: "https://yandex.uz/maps/?ll=69.216837%2C41.334880&z=17&pt=69.216837,41.334880,pm2rdm",
+                },
+              ],
+              [{ text: getText(lang, "back"), callback_data: "menu:back" }],
+            ],
           },
-        ],
-        [{ text: getText(lang, "back"), callback_data: "menu:back" }],
-      ],
-    },
-  });
+        });
 
-  return NextResponse.json({ ok: true });
-}
-
-
-
+        return NextResponse.json({ ok: true });
+      }
 
       if (text === getText(lang, "language")) {
-        await telegramBot("sendMessage", {
+        await sendTelegram("sendMessage", {
           chat_id: chatId,
           text: getText(lang, "chooseLanguage"),
           reply_markup: languageKeyboard(),
@@ -196,7 +224,11 @@ if (text === getText(lang, "about")) {
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
-    console.error("telegram webhook error:", error);
+    console.error("TELEGRAM_WEBHOOK_ERROR", {
+      message: error?.message || "Unknown error",
+      stack: error?.stack || null,
+      ts: new Date().toISOString(),
+    });
 
     return NextResponse.json(
       {
