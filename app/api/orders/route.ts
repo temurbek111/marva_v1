@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { sendTelegramAdminOrder } from "@/lib/telegram-bot";
+import { sendTelegramAdminOrder, telegramBot } from "@/lib/telegram-bot";
+
 export const runtime = "nodejs";
-
-
 
 type OrderItem = {
   product_name?: string;
@@ -22,6 +21,20 @@ type OrderRequestBody = {
   note?: string;
   totalAmount?: number | string;
   items?: unknown;
+};
+
+type TelegramOrderPayload = {
+  orderId: string;
+  fullName?: string;
+  phone?: string;
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  note?: string;
+  totalAmount?: number | string;
+  items: OrderItem[];
+  moyskladOrderName?: string;
+  updatedStock?: number | null;
 };
 
 const MOYSKLAD_BASE =
@@ -141,6 +154,64 @@ async function createMoyskladOrder(params: {
   return res.json();
 }
 
+function buildTelegramOrderText(params: TelegramOrderPayload) {
+  const itemsText =
+    params.items.length > 0
+      ? params.items
+          .map((item, index) => {
+            const name = item.product_name || "Noma’lum mahsulot";
+            const qty = Number(item.quantity || 0);
+            const price = item.price ?? "-";
+            return `${index + 1}. ${name} x ${qty} — ${price}`;
+          })
+          .join("\n")
+      : "Mahsulotlar yo‘q";
+
+  return [
+    "🆕 New order",
+    `Order ID: #${params.orderId}`,
+    `Client: ${params.fullName || "-"}`,
+    `Phone: ${params.phone || "-"}`,
+    `Address: ${params.address || "-"}`,
+    params.latitude != null && params.longitude != null
+      ? `Location: ${params.latitude}, ${params.longitude}`
+      : null,
+    `Note: ${params.note || "-"}`,
+    `Total: ${params.totalAmount ?? "-"}`,
+    `MoySklad: ${params.moyskladOrderName || "-"}`,
+    params.updatedStock != null ? `Updated stock: ${params.updatedStock}` : null,
+    "",
+    "Items:",
+    itemsText,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function sendTelegramGroupOrder(params: TelegramOrderPayload) {
+  const groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID;
+
+  if (!groupChatId) {
+    console.warn("TELEGRAM_GROUP_CHAT_ID topilmadi, group notification skipped");
+    return;
+  }
+
+  const text = buildTelegramOrderText(params);
+
+  await telegramBot("sendMessage", {
+    chat_id: groupChatId,
+    text,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept:${params.orderId}` },
+          { text: "❌ Cancel", callback_data: `cancel:${params.orderId}` },
+        ],
+      ],
+    },
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as OrderRequestBody;
@@ -192,7 +263,7 @@ export async function POST(req: Request) {
       updatedStock = await getProductStock(firstMappedItem.moysklad_product_id);
     }
 
-    await sendTelegramAdminOrder({
+    const telegramPayload: TelegramOrderPayload = {
       orderId: String(orderId),
       fullName,
       phone,
@@ -204,7 +275,10 @@ export async function POST(req: Request) {
       items: safeItems,
       moyskladOrderName: moyskladOrder?.name || moyskladOrder?.id || "-",
       updatedStock,
-    });
+    };
+
+    await sendTelegramAdminOrder(telegramPayload);
+    await sendTelegramGroupOrder(telegramPayload);
 
     return NextResponse.json({
       success: true,
