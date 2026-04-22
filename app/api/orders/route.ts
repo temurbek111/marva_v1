@@ -3,6 +3,8 @@ import { sendTelegramAdminOrder } from "@/lib/telegram-bot";
 
 export const runtime = "nodejs";
 
+
+
 type OrderItem = {
   product_name?: string;
   quantity?: number;
@@ -179,16 +181,16 @@ export async function POST(req: Request) {
     }
 
     await sendTelegramAdminOrder({
-      orderId: String(orderId),
-      fullName,
-      phone,
-      address,
-      note,
-      totalAmount,
-      items: safeItems,
-      moyskladOrderName: moyskladOrder?.name || moyskladOrder?.id || "-",
-      updatedStock,
-    });
+  orderId: String(orderId),
+  fullName,
+  phone,
+  address,
+  note,
+  totalAmount,
+  items: safeItems,
+  moyskladOrderName: moyskladOrder?.name || moyskladOrder?.id || "-",
+  updatedStock,
+});
 
     return NextResponse.json({
       success: true,

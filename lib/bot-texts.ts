@@ -11,6 +11,7 @@ export const TEXTS = {
     language: "🌐 Til",
     back: "⬅️ Orqaga",
     openCatalog: "🛒 Katalogni ochish",
+    openMap: "📍 Xaritani ochish",
     contactText: [
       "🦷 Marva Dental",
       "",
@@ -22,6 +23,7 @@ export const TEXTS = {
     operatorText:
       "Operator bilan bog‘lanish uchun shu yerga telefon raqamingiz yoki xabaringizni yuboring.",
     ordersEmpty: "Sizda hozircha buyurtmalar yo‘q.",
+    languageChanged: "O‘zbek tili tanlandi",
   },
   ru: {
     chooseLanguage: "Выберите язык:",
@@ -33,6 +35,7 @@ export const TEXTS = {
     language: "🌐 Язык",
     back: "⬅️ Назад",
     openCatalog: "🛒 Открыть каталог",
+    openMap: "📍 Открыть карту",
     contactText: [
       "🦷 Marva Dental",
       "",
@@ -44,9 +47,12 @@ export const TEXTS = {
     operatorText:
       "Чтобы связаться с оператором, отправьте сюда свой номер телефона или сообщение.",
     ordersEmpty: "У вас пока нет заказов.",
+    languageChanged: "Выбран русский язык",
   },
 } as const;
 
-export function getText(lang: BotLang, key: keyof (typeof TEXTS)["uz"]) {
+export type BotTextKey = keyof (typeof TEXTS)["uz"];
+
+export function getText(lang: BotLang, key: BotTextKey) {
   return TEXTS[lang][key];
 }

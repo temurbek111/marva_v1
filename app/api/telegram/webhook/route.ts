@@ -34,15 +34,16 @@ export async function POST(req: NextRequest) {
     const message = update.message;
     const callback = update.callback_query;
 
-   if (message?.text === "/start") {
-  await telegramBot("sendMessage", {
-    chat_id: message.chat.id,
-    text: getText(getUserLang(update), "chooseLanguage"),
-    reply_markup: languageKeyboard(),
-  });
+    if (message?.text === "/start") {
+      await telegramBot("sendMessage", {
+        chat_id: message.chat.id,
+        text: getText(getUserLang(update), "chooseLanguage"),
+        reply_markup: languageKeyboard(),
+      });
 
-  return NextResponse.json({ ok: true });
-}
+      return NextResponse.json({ ok: true });
+    }
+
     if (callback) {
       const data = String(callback.data || "");
       const chatId = callback.message?.chat?.id;
@@ -58,7 +59,10 @@ export async function POST(req: NextRequest) {
 
         await telegramBot("answerCallbackQuery", {
           callback_query_id: callback.id,
-          text: selectedLang === "uz" ? "O‘zbek tili tanlandi" : "Выбран русский язык",
+          text:
+            selectedLang === "uz"
+              ? "O‘zbek tili tanlandi"
+              : "Выбран русский язык",
         });
 
         if (messageId) {
@@ -165,7 +169,7 @@ export async function POST(req: NextRequest) {
               [
                 {
                   text: "📍 Open map",
-                  url: "https://maps.google.com",
+                  url: "https://yandex.uz/maps/?ll=69.216837%2C41.334880&z=17&pt=69.216837,41.334880,pm2rdm",
                 },
               ],
               [{ text: getText(lang, "back"), callback_data: "menu:back" }],

@@ -1,6 +1,8 @@
 import type { BotLang } from "@/lib/bot-texts";
 import { getText } from "@/lib/bot-texts";
 
+const WEB_APP_URL = "https://marva-v1.vercel.app";
+
 export function languageKeyboard() {
   return {
     inline_keyboard: [
@@ -31,7 +33,7 @@ export function productsKeyboard(lang: BotLang) {
       [
         {
           text: getText(lang, "openCatalog"),
-          web_app: { url: "https://marva-v1.vercel.app" },
+          web_app: { url: WEB_APP_URL },
         },
       ],
       [{ text: getText(lang, "back"), callback_data: "menu:back" }],
@@ -42,6 +44,20 @@ export function productsKeyboard(lang: BotLang) {
 export function backInlineKeyboard(lang: BotLang) {
   return {
     inline_keyboard: [
+      [{ text: getText(lang, "back"), callback_data: "menu:back" }],
+    ],
+  };
+}
+
+export function aboutKeyboard(lang: BotLang) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: getText(lang, "openMap"),
+          url: "https://www.google.com/maps/search/?api=1&query=Toshkent%2C%20Olmazor%2C%20Farobiy%2094",
+        },
+      ],
       [{ text: getText(lang, "back"), callback_data: "menu:back" }],
     ],
   };
