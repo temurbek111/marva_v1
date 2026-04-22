@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { getTelegramLang } from "@/lib/telegram";
+import { getTelegramLang } from "@/lib/web-telegram";
 import type { Lang } from "@/lib/i18n";
 
 type LangContextType = {

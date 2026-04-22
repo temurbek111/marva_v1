@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { initTelegramApp } from "@/lib/telegram";
+import { initTelegramApp } from "@/lib/web-telegram";
 
 export function TelegramInit() {
   useEffect(() => {

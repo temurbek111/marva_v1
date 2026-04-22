@@ -6,7 +6,7 @@ import { useAppLang } from "@/components/common/LangProvider";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
-import { getTelegramUser } from "@/lib/telegram";
+import { getTelegramUser } from "@/lib/web-telegram";
 import { supabase } from "@/lib/supabase";
 import {
   Phone,

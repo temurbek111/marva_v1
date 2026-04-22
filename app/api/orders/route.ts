@@ -10,6 +10,16 @@ type OrderItem = {
   moysklad_product_id?: string;
 };
 
+type OrderRequestBody = {
+  orderId?: string | number;
+  fullName?: string;
+  phone?: string;
+  address?: string;
+  note?: string;
+  totalAmount?: number | string;
+  items?: unknown;
+};
+
 const MOYSKLAD_BASE =
   process.env.MOYSKLAD_BASE_URL || "https://api.moysklad.ru/api/remap/1.2";
 
@@ -26,47 +36,6 @@ function getMoyskladHeaders() {
     "Content-Type": "application/json",
     Authorization: `Bearer ${MOYSKLAD_TOKEN}`,
   };
-}
-
-async function sendTelegramMessage(text: string) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) {
-    throw new Error("Telegram env topilmadi");
-  }
-
-  const telegramRes = await fetch(
-    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_ADMIN_CHAT_ID,
-        text,
-      }),
-      cache: "no-store",
-    }
-  );
-
-  const telegramData = await telegramRes.json();
-
-  if (!telegramRes.ok || !telegramData?.ok) {
-    throw new Error(telegramData?.description || "Telegramga yuborilmadi");
-  }
-}
-
-async function getProductStock(productId: string): Promise<number> {
-  const res = await fetch(`${MOYSKLAD_BASE}/entity/product/${productId}`, {
-    method: "GET",
-    headers: getMoyskladHeaders(),
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`MoySklad product olishda xato: ${text}`);
-  }
-
-  const data = await res.json();
-  return Number(data?.stock || 0);
 }
 
 function normalizeItems(items: unknown): OrderItem[] {
@@ -96,6 +65,7 @@ function buildItemsText(items: OrderItem[]) {
       const name = item.product_name || "Nomsiz mahsulot";
       const quantity = Number(item.quantity ?? 0);
       const price = item.price ?? 0;
+
       return `${index + 1}. ${name} — ${quantity} dona — ${price}`;
     })
     .join("\n");
@@ -115,6 +85,22 @@ function buildMoyskladPositions(items: OrderItem[]) {
         },
       },
     }));
+}
+
+async function getProductStock(productId: string): Promise<number> {
+  const res = await fetch(`${MOYSKLAD_BASE}/entity/product/${productId}`, {
+    method: "GET",
+    headers: getMoyskladHeaders(),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`MoySklad product olishda xato: ${text}`);
+  }
+
+  const data = await res.json();
+  return Number(data?.stock || 0);
 }
 
 async function createMoyskladOrder(params: {
@@ -160,9 +146,82 @@ async function createMoyskladOrder(params: {
   return res.json();
 }
 
+async function sendTelegramOrderMessage(params: {
+  orderId: string;
+  fullName?: string;
+  phone?: string;
+  address?: string;
+  note?: string;
+  totalAmount?: number | string;
+  items: OrderItem[];
+  moyskladOrderName?: string;
+  updatedStock?: number | null;
+}) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) {
+    throw new Error("Telegram env topilmadi");
+  }
+
+  const itemsText = buildItemsText(params.items);
+
+  const text = [
+    "🦷 Yangi buyurtma (Admin)",
+    "",
+    `Order ID: #${params.orderId}`,
+    `Mijoz: ${params.fullName || "-"}`,
+    `Telefon: ${params.phone || "-"}`,
+    `Manzil: ${params.address || "-"}`,
+    `Izoh: ${params.note || "-"}`,
+    `Jami: ${params.totalAmount || "-"}`,
+    `MoySklad order: ${params.moyskladOrderName || "-"}`,
+    params.updatedStock !== null && params.updatedStock !== undefined
+      ? `Yangilangan qoldiq: ${params.updatedStock}`
+      : null,
+    "",
+    "Mahsulotlar:",
+    itemsText,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const telegramRes = await fetch(
+    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_ADMIN_CHAT_ID,
+        text,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "✅ Qabul qilish",
+                callback_data: `accept:${params.orderId}`,
+              },
+              {
+                text: "❌ Bekor qilish",
+                callback_data: `cancel:${params.orderId}`,
+              },
+            ],
+          ],
+        },
+      }),
+      cache: "no-store",
+    }
+  );
+
+  const telegramData = await telegramRes.json();
+
+  if (!telegramRes.ok || !telegramData?.ok) {
+    throw new Error(telegramData?.description || "Telegramga yuborilmadi");
+  }
+
+  return telegramData;
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as OrderRequestBody;
 
     const {
       orderId,
@@ -191,8 +250,6 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("ORDER ITEMS:", safeItems);
-
     const moyskladOrder = await createMoyskladOrder({
       orderId: String(orderId),
       fullName,
@@ -209,27 +266,17 @@ export async function POST(req: Request) {
       updatedStock = await getProductStock(firstMappedItem.moysklad_product_id);
     }
 
-    const itemsText = buildItemsText(safeItems);
-
-    const text = [
-      "🦷 Yangi buyurtma (Admin)",
-      "",
-      `Order ID: #${orderId}`,
-      `Mijoz: ${fullName || "-"}`,
-      `Telefon: ${phone || "-"}`,
-      `Manzil: ${address || "-"}`,
-      `Izoh: ${note || "-"}`,
-      `Jami: ${totalAmount || "-"}`,
-      `MoySklad order: ${moyskladOrder?.name || moyskladOrder?.id || "-"}`,
-      updatedStock !== null ? `Yangilangan qoldiq: ${updatedStock}` : null,
-      "",
-      "Mahsulotlar:",
-      itemsText,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    await sendTelegramMessage(text);
+    await sendTelegramOrderMessage({
+      orderId: String(orderId),
+      fullName,
+      phone,
+      address,
+      note,
+      totalAmount,
+      items: safeItems,
+      moyskladOrderName: moyskladOrder?.name || moyskladOrder?.id || "-",
+      updatedStock,
+    });
 
     return NextResponse.json({
       success: true,
