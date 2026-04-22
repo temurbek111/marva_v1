@@ -46,7 +46,7 @@ export default function CartPage() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-[#EEF3F1] pb-[290px]">
+    <div className="min-h-screen bg-[#EEF3F1] pb-[110px]">
       <Container className="py-5">
         <div className="rounded-[28px] bg-white p-5 shadow-soft">
           <div className="flex items-start justify-between gap-4">
@@ -93,79 +93,79 @@ export default function CartPage() {
               </Link>
             </div>
           ) : (
-            items.map((item) => (
-              <div
-                key={item.product.id}
-                className="rounded-[24px] bg-white p-4 shadow-soft"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1 pr-2">
-                    <h3 className="break-words font-semibold text-marva-900">
-                      {item.product.name}
-                    </h3>
-                    <p className="mt-1 break-words text-sm text-marva-700/70">
-                      {formatPrice(item.product.price)} x {item.quantity}
-                    </p>
+            <>
+              {items.map((item) => (
+                <div
+                  key={item.product.id}
+                  className="rounded-[24px] bg-white p-4 shadow-soft"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <h3 className="break-words font-semibold text-marva-900">
+                        {item.product.name}
+                      </h3>
+                      <p className="mt-1 break-words text-sm text-marva-700/70">
+                        {formatPrice(item.product.price)} x {item.quantity}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => removeItem(item.product.id)}
+                      className="shrink-0 text-sm text-red-500"
+                    >
+                      {lang === "uz" ? "O‘chirish" : "Удалить"}
+                    </button>
                   </div>
 
-                  <button
-                    onClick={() => removeItem(item.product.id)}
-                    className="shrink-0 text-sm text-red-500"
-                  >
-                    {lang === "uz" ? "O‘chirish" : "Удалить"}
-                  </button>
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      onClick={() =>
+                        changeQuantity(item.product.id, item.quantity - 1)
+                      }
+                      className="flex h-10 w-10 items-center justify-center rounded-2xl bg-marva-50"
+                    >
+                      -
+                    </button>
+
+                    <div className="rounded-2xl bg-marva-50 px-4 py-2">
+                      {item.quantity}
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        changeQuantity(item.product.id, item.quantity + 1)
+                      }
+                      className="flex h-10 w-10 items-center justify-center rounded-2xl bg-marva-50"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
+              ))}
 
-                <div className="mt-4 flex items-center gap-3">
-                  <button
-                    onClick={() =>
-                      changeQuantity(item.product.id, item.quantity - 1)
-                    }
-                    className="flex h-10 w-10 items-center justify-center rounded-2xl bg-marva-50"
-                  >
-                    -
-                  </button>
+              <div className="sticky bottom-[88px] z-40 mt-5">
+                <div className="mx-auto w-full max-w-md pb-[calc(env(safe-area-inset-bottom)+8px)]">
+                  <div className="rounded-[28px] bg-marva-800 p-5 text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
+                    <div className="flex items-center justify-between gap-4">
+                      <span>{lang === "uz" ? "Jami" : "Итого"}</span>
+                      <span className="shrink-0 text-2xl font-bold">
+                        {formatPrice(total)}
+                      </span>
+                    </div>
 
-                  <div className="rounded-2xl bg-marva-50 px-4 py-2">
-                    {item.quantity}
+                    <button
+                      onClick={handleCheckout}
+                      className="mt-4 block w-full rounded-[20px] bg-white px-4 py-4 text-center font-semibold text-marva-800"
+                    >
+                      {lang === "uz" ? "Rasmiylashtirish" : "Оформить заказ"}
+                    </button>
                   </div>
-
-                  <button
-                    onClick={() =>
-                      changeQuantity(item.product.id, item.quantity + 1)
-                    }
-                    className="flex h-10 w-10 items-center justify-center rounded-2xl bg-marva-50"
-                  >
-                    +
-                  </button>
                 </div>
               </div>
-            ))
+            </>
           )}
         </div>
       </Container>
-
-      {items.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-[88px] z-40 px-4">
-          <div className="mx-auto w-full max-w-md pb-[calc(env(safe-area-inset-bottom)+8px)]">
-            <div className="rounded-[28px] bg-marva-800 p-5 text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center justify-between gap-4">
-                <span>{lang === "uz" ? "Jami" : "Итого"}</span>
-                <span className="shrink-0 text-2xl font-bold">
-                  {formatPrice(total)}
-                </span>
-              </div>
-
-              <button
-                onClick={handleCheckout}
-                className="mt-4 block w-full rounded-[20px] bg-white px-4 py-4 text-center font-semibold text-marva-800"
-              >
-                {lang === "uz" ? "Rasmiylashtirish" : "Оформить заказ"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <BottomNav />
     </div>
