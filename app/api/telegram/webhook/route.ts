@@ -10,6 +10,8 @@ import {
 
 export const runtime = "nodejs";
 
+const processedUpdates = new Set<number>();
+
 function getUserLang(update: any): BotLang {
   const code =
     update?.message?.from?.language_code ||
@@ -62,6 +64,23 @@ export async function POST(req: NextRequest) {
     const update = await req.json();
     logIncomingUpdate(update);
 
+    if (typeof update?.update_id === "number") {
+      if (processedUpdates.has(update.update_id)) {
+        console.log("DUPLICATE_UPDATE_SKIPPED", {
+          update_id: update.update_id,
+          ts: new Date().toISOString(),
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+
+      processedUpdates.add(update.update_id);
+
+      setTimeout(() => {
+        processedUpdates.delete(update.update_id);
+      }, 5 * 60 * 1000);
+    }
+
     const message = update?.message;
     const callback = update?.callback_query;
 
@@ -97,11 +116,19 @@ export async function POST(req: NextRequest) {
         });
 
         if (messageId) {
-          await sendTelegram("editMessageText", {
-            chat_id: chatId,
-            message_id: messageId,
-            text: getText(selectedLang, "mainMenu"),
-          });
+          try {
+            await sendTelegram("deleteMessage", {
+              chat_id: chatId,
+              message_id: messageId,
+            });
+          } catch (deleteError: any) {
+            console.warn("DELETE_LANGUAGE_MESSAGE_FAILED", {
+              message: deleteError?.message || "Unknown error",
+              chat_id: chatId,
+              message_id: messageId,
+              ts: new Date().toISOString(),
+            });
+          }
         }
 
         await sendTelegram("sendMessage", {
