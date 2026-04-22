@@ -28,16 +28,7 @@ function getMoyskladHeaders() {
   };
 }
 
-async function sendTelegramMessage(
-  text: string,
-  inline_keyboard?: Array<
-    Array<{
-      text: string;
-      url?: string;
-      callback_data?: string;
-    }>
-  >
-) {
+async function sendTelegramMessage(text: string) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) {
     throw new Error("Telegram env topilmadi");
   }
@@ -50,7 +41,6 @@ async function sendTelegramMessage(
       body: JSON.stringify({
         chat_id: TELEGRAM_ADMIN_CHAT_ID,
         text,
-        reply_markup: inline_keyboard ? { inline_keyboard } : undefined,
       }),
       cache: "no-store",
     }
@@ -61,8 +51,6 @@ async function sendTelegramMessage(
   if (!telegramRes.ok || !telegramData?.ok) {
     throw new Error(telegramData?.description || "Telegramga yuborilmadi");
   }
-
-  return telegramData;
 }
 
 async function getProductStock(productId: string): Promise<number> {
@@ -241,28 +229,7 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join("\n");
 
-    await sendTelegramMessage(text, [
-      [
-        {
-          text: "Admin panel",
-          url: `${process.env.NEXT_PUBLIC_WEBAPP_URL}/admin`,
-        },
-        {
-          text: "Buyurtmalar",
-          url: `${process.env.NEXT_PUBLIC_WEBAPP_URL}/orders`,
-        },
-      ],
-      [
-        {
-          text: "Qabul qilindi",
-          callback_data: `accept:${orderId}`,
-        },
-        {
-          text: "Bekor qilindi",
-          callback_data: `cancel:${orderId}`,
-        },
-      ],
-    ]);
+    await sendTelegramMessage(text);
 
     return NextResponse.json({
       success: true,
