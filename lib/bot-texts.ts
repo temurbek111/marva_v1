@@ -21,8 +21,8 @@ export const TEXTS = {
   "🕘 Ish vaqti: Du-Sha 9:00 - 18:00",
   "🚚 Yetkazib berish: Toshkent bo‘ylab mavjud",
 ].join("\n"),
-    operatorText:
-      "Operator bilan bog‘lanish uchun shu yerga telefon raqamingiz yoki xabaringizni yuboring.",
+   operatorText:
+  "Operator bilan bog‘lanish uchun quyidagi raqamga qo‘ng‘iroq qiling:\n+998994113020\n\nYoki shu yerga xabaringizni yuboring.",
     ordersEmpty: "Sizda hozircha buyurtmalar yo‘q.",
     languageChanged: "O‘zbek tili tanlandi",
   },
@@ -46,7 +46,7 @@ export const TEXTS = {
       "🚚 Доставка: доступна по Ташкенту",
     ].join("\n"),
     operatorText:
-      "Чтобы связаться с оператором, отправьте сюда свой номер телефона или сообщение.",
+  "Чтобы связаться с оператором, позвоните по номеру:\n+998994113020\n\nИли отправьте сюда своё сообщение.",
     ordersEmpty: "У вас пока нет заказов.",
     languageChanged: "Выбран русский язык",
   },

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { sendTelegramAdminOrder } from "@/lib/telegram-bot";
-
 export const runtime = "nodejs";
 
 
@@ -18,6 +17,8 @@ type OrderRequestBody = {
   fullName?: string;
   phone?: string;
   address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   note?: string;
   totalAmount?: number | string;
   items?: unknown;
@@ -95,6 +96,8 @@ async function createMoyskladOrder(params: {
   fullName?: string;
   phone?: string;
   address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   note?: string;
   items: OrderItem[];
 }) {
@@ -113,8 +116,13 @@ async function createMoyskladOrder(params: {
       `Mijoz: ${params.fullName || "-"}`,
       `Telefon: ${params.phone || "-"}`,
       `Manzil: ${params.address || "-"}`,
+      params.latitude && params.longitude
+        ? `Koordinata: ${params.latitude}, ${params.longitude}`
+        : null,
       `Izoh: ${params.note || "-"}`,
-    ].join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n"),
     positions,
   };
 
@@ -142,6 +150,8 @@ export async function POST(req: Request) {
       fullName,
       phone,
       address,
+      latitude,
+      longitude,
       note,
       totalAmount,
       items,
@@ -169,6 +179,8 @@ export async function POST(req: Request) {
       fullName,
       phone,
       address,
+      latitude,
+      longitude,
       note,
       items: safeItems,
     });
@@ -181,16 +193,18 @@ export async function POST(req: Request) {
     }
 
     await sendTelegramAdminOrder({
-  orderId: String(orderId),
-  fullName,
-  phone,
-  address,
-  note,
-  totalAmount,
-  items: safeItems,
-  moyskladOrderName: moyskladOrder?.name || moyskladOrder?.id || "-",
-  updatedStock,
-});
+      orderId: String(orderId),
+      fullName,
+      phone,
+      address,
+      latitude,
+      longitude,
+      note,
+      totalAmount,
+      items: safeItems,
+      moyskladOrderName: moyskladOrder?.name || moyskladOrder?.id || "-",
+      updatedStock,
+    });
 
     return NextResponse.json({
       success: true,

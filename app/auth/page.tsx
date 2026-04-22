@@ -6,6 +6,7 @@ import { useAppLang } from "@/components/common/LangProvider";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
+import DeliveryLocationField from "@/components/DeliveryLocationField";
 import { getTelegramUser } from "@/lib/web-telegram";
 import { supabase } from "@/lib/supabase";
 import {
@@ -58,6 +59,8 @@ export default function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [telegramUsername, setTelegramUsername] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -76,9 +79,14 @@ export default function AuthPage() {
 
       if (tgUser) {
         const name = `${tgUser.first_name ?? ""} ${tgUser.last_name ?? ""}`.trim();
+
         setFullName(
-          name || (lang === "uz" ? "Telegram foydalanuvchi" : "Пользователь Telegram")
+          name ||
+            (lang === "uz"
+              ? "Telegram foydalanuvchi"
+              : "Пользователь Telegram")
         );
+
         setTelegramUsername(tgUser.username ? `@${tgUser.username}` : "");
 
         if (supabase && tgUser.id) {
@@ -221,17 +229,20 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-28">
       <Header />
+
       <Container className="space-y-5 py-5">
         <div className="overflow-hidden rounded-[32px] bg-white/95 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
           <div className="bg-[#004F45] px-5 pb-6 pt-5 text-white">
             <p className="text-sm text-white/75">
               {lang === "uz" ? "Kirish / Ro'yxatdan o'tish" : "Вход / Регистрация"}
             </p>
+
             <h1 className="mt-1 text-[28px] font-bold leading-9">
               {lang === "uz"
                 ? "Ma'lumotlaringizni kiriting"
                 : "Введите ваши данные"}
             </h1>
+
             <p className="mt-2 text-sm text-white/80">
               {tgUser?.id
                 ? lang === "uz"
@@ -241,6 +252,7 @@ export default function AuthPage() {
                 ? "ℹ️ Brauzerda ochilgan"
                 : "ℹ️ Открыто в браузере"}
             </p>
+
             <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium">
               <ShieldCheck size={16} />
               {lang === "uz" ? "Xavfsiz kirish" : "Безопасный вход"}
@@ -253,6 +265,7 @@ export default function AuthPage() {
                 <User size={14} />
                 {lang === "uz" ? "Ism Familiya" : "Имя и фамилия"}
               </label>
+
               <input
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -268,6 +281,7 @@ export default function AuthPage() {
                 <Phone size={14} />
                 {lang === "uz" ? "Telefon" : "Телефон"}
               </label>
+
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -281,13 +295,14 @@ export default function AuthPage() {
                 <MapPin size={14} />
                 {lang === "uz" ? "Manzil" : "Адрес"}
               </label>
-              <input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder={
-                  lang === "uz" ? "Toshkent, O'zbekiston" : "Ташкент, Узбекистан"
-                }
-                className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
+
+              <DeliveryLocationField
+                address={address}
+                setAddress={setAddress}
+                latitude={latitude}
+                setLatitude={setLatitude}
+                longitude={longitude}
+                setLongitude={setLongitude}
               />
             </div>
 
@@ -297,6 +312,7 @@ export default function AuthPage() {
                   <Calendar size={14} />
                   {lang === "uz" ? "Yosh" : "Возраст"}
                 </label>
+
                 <input
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
@@ -311,6 +327,7 @@ export default function AuthPage() {
                   <User size={14} />
                   {lang === "uz" ? "Jins" : "Пол"}
                 </label>
+
                 <select
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}
@@ -328,6 +345,7 @@ export default function AuthPage() {
                 <Building2 size={14} />
                 {lang === "uz" ? "Kimligi" : "Статус"}
               </label>
+
               <select
                 value={customerType}
                 onChange={(e) => setCustomerType(e.target.value)}
@@ -357,10 +375,11 @@ export default function AuthPage() {
                   ? "Klinika / kompaniya nomi"
                   : "Название клиники / компании"}
               </label>
+
               <input
                 value={clinicName}
                 onChange={(e) => setClinicName(e.target.value)}
-                placeholder={lang === "uz" ? "Dental Clinic" : "Dental Clinic"}
+                placeholder="Dental Clinic"
                 className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
               />
             </div>
@@ -370,6 +389,7 @@ export default function AuthPage() {
                 <Send size={14} />
                 Telegram username
               </label>
+
               <input
                 value={telegramUsername}
                 onChange={(e) => setTelegramUsername(e.target.value)}
@@ -394,6 +414,7 @@ export default function AuthPage() {
           </div>
         </div>
       </Container>
+
       <BottomNav />
     </div>
   );

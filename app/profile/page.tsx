@@ -98,7 +98,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const parsed = JSON.parse(saved);
+      const parsed = JSON.parse(saved) as SavedUser;
       setUser(parsed);
     } catch {
       router.push("/auth");
@@ -176,10 +176,12 @@ export default function ProfilePage() {
 
             <div className="min-w-0 flex-1">
               <div className="text-[20px] font-bold text-[#111827]">
-                {user.fullName || (lang === "uz" ? "Foydalanuvchi" : "Пользователь")}
+                {user.fullName ||
+                  (lang === "uz" ? "Foydalanuvchi" : "Пользователь")}
               </div>
               <div className="mt-1 text-[17px] text-[#9CA3AF]">
-                {user.phone || (lang === "uz" ? "Telefon yo‘q" : "Нет телефона")}
+                {user.phone ||
+                  (lang === "uz" ? "Telefon yo‘q" : "Нет телефона")}
               </div>
             </div>
 
@@ -203,23 +205,37 @@ export default function ProfilePage() {
 
           <MenuItem
             icon={<Eye size={24} />}
-            title={lang === "uz" ? "Ko‘rilgan mahsulotlar" : "Просмотренные товары"}
+            title={
+              lang === "uz"
+                ? "Ko‘rilgan mahsulotlar"
+                : "Просмотренные товары"
+            }
             onClick={() => router.push("/viewed")}
           />
         </SectionCard>
 
-        <SectionCard title={lang === "uz" ? "Shaxsiy kabinet" : "Личный кабинет"}>
+        <SectionCard
+          title={lang === "uz" ? "Shaxsiy kabinet" : "Личный кабинет"}
+        >
           <MenuItem
             icon={<User size={24} />}
             title={lang === "uz" ? "Profilim" : "Мой профиль"}
-            subtitle={user.telegramUsername || (lang === "uz" ? "@username_mavjud_emas" : "@username_не_указан")}
+            subtitle={
+              user.telegramUsername ||
+              (lang === "uz"
+                ? "@username_mavjud_emas"
+                : "@username_не_указан")
+            }
             onClick={() => router.push("/profile/edit")}
           />
 
           <MenuItem
             icon={<MapPin size={24} />}
             title={lang === "uz" ? "Manzillarim" : "Мои адреса"}
-            subtitle={user.address || (lang === "uz" ? "Manzil kiritilmagan" : "Адрес не указан")}
+            subtitle={
+              user.address ||
+              (lang === "uz" ? "Manzil kiritilmagan" : "Адрес не указан")
+            }
             onClick={() => router.push("/addresses")}
           />
         </SectionCard>

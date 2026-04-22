@@ -9,6 +9,8 @@ export type TelegramOrderPayload = {
   fullName?: string;
   phone?: string;
   address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   note?: string;
   totalAmount?: number | string;
   items: TelegramOrderItem[];
@@ -73,6 +75,9 @@ export async function sendTelegramAdminOrder(params: TelegramOrderPayload) {
     `Mijoz: ${params.fullName || "-"}`,
     `Telefon: ${params.phone || "-"}`,
     `Manzil: ${params.address || "-"}`,
+    params.latitude && params.longitude
+      ? `Koordinata: ${params.latitude}, ${params.longitude}`
+      : null,
     `Izoh: ${params.note || "-"}`,
     `Jami: ${params.totalAmount || "-"}`,
     `MoySklad order: ${params.moyskladOrderName || "-"}`,
