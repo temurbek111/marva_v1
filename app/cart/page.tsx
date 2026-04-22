@@ -46,7 +46,7 @@ export default function CartPage() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-[#EEF3F1] pb-44">
+    <div className="min-h-screen bg-[#EEF3F1] pb-[290px]">
       <Container className="py-5">
         <div className="rounded-[28px] bg-white p-5 shadow-soft">
           <div className="flex items-start justify-between gap-4">
@@ -74,7 +74,7 @@ export default function CartPage() {
           </div>
         </div>
 
-        <div className="mt-5 space-y-4">
+        <div className="mt-5 space-y-5">
           {items.length === 0 ? (
             <div className="rounded-[28px] bg-white p-6 text-center shadow-soft">
               <p className="text-lg font-semibold text-marva-900">
@@ -99,11 +99,11 @@ export default function CartPage() {
                 className="rounded-[24px] bg-white p-4 shadow-soft"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-marva-900">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <h3 className="break-words font-semibold text-marva-900">
                       {item.product.name}
                     </h3>
-                    <p className="mt-1 text-sm text-marva-700/70">
+                    <p className="mt-1 break-words text-sm text-marva-700/70">
                       {formatPrice(item.product.price)} x {item.quantity}
                     </p>
                   </div>
@@ -146,12 +146,14 @@ export default function CartPage() {
       </Container>
 
       {items.length > 0 ? (
-        <div className="fixed bottom-[88px] left-0 right-0 z-40">
-          <div className="mx-auto w-full max-w-md px-4">
+        <div className="fixed inset-x-0 bottom-[88px] z-40 px-4">
+          <div className="mx-auto w-full max-w-md pb-[calc(env(safe-area-inset-bottom)+8px)]">
             <div className="rounded-[28px] bg-marva-800 p-5 text-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <span>{lang === "uz" ? "Jami" : "Итого"}</span>
-                <span className="text-2xl font-bold">{formatPrice(total)}</span>
+                <span className="shrink-0 text-2xl font-bold">
+                  {formatPrice(total)}
+                </span>
               </div>
 
               <button
