@@ -11,7 +11,9 @@ async function telegram(method: string, body: Record<string, unknown>) {
 
   const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
     cache: "no-store",
   });
@@ -32,25 +34,23 @@ export async function POST(req: NextRequest) {
     const message = update.message;
     const callback = update.callback_query;
 
-    // /start uchun
-  if (message?.text === "/start") {
-  await telegram("sendMessage", {
-    chat_id: message.chat.id,
-    text: "Bot ishladi ✅",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Qabul qilish", callback_data: "accept:123" },
-          { text: "❌ Bekor qilish", callback_data: "cancel:123" }
-        ]
-      ]
+    if (message?.text === "/start") {
+      await telegram("sendMessage", {
+        chat_id: message.chat.id,
+        text: "Tanlang:",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "✅ Qabul qilish", callback_data: "accept:123" },
+              { text: "❌ Bekor qilish", callback_data: "cancel:123" },
+            ],
+          ],
+        },
+      });
+
+      return NextResponse.json({ ok: true });
     }
-  });
 
-  return NextResponse.json({ ok: true });
-}
-
-    // oddiy message bo'lsa, shunchaki ok qaytaramiz
     if (!callback) {
       return NextResponse.json({ ok: true });
     }
