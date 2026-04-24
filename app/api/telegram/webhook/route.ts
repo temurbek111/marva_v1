@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { telegramBot } from "@/lib/telegram-bot";
+import { supabaseServer } from "@/lib/supabase-server";
 import { type BotLang, getText } from "@/lib/bot-texts";
 import {
   languageKeyboard,
@@ -7,7 +8,6 @@ import {
   productsKeyboard,
   backInlineKeyboard,
 } from "@/lib/bot-menu";
-
 export const runtime = "nodejs";
 
 const processedUpdates = new Set<number>();
@@ -20,6 +20,108 @@ type MenuAction =
   | "about"
   | "language"
   | null;
+
+type DbCustomer = {
+  id: number;
+  full_name: string | null;
+  telegram_id: number | null;
+  phone: string | null;
+};
+
+type DbOrder = {
+  id: number;
+  created_at: string;
+  total_amount: number | null;
+  order_status: string | null;
+};
+
+function getTelegramUserId(update: any): number | null {
+  return (
+    update?.message?.from?.id ||
+    update?.callback_query?.from?.id ||
+    null
+  );
+}
+
+async function getCustomerOrdersByTelegramUser(telegramUserId: number) {
+  const { data: customer, error: customerError } = await supabaseServer
+    .from("customers")
+    .select("id, full_name, telegram_id, phone")
+    .eq("telegram_id", telegramUserId)
+    .maybeSingle();
+
+  if (customerError) {
+    throw new Error(customerError.message);
+  }
+
+  if (!customer) {
+    return {
+      customer: null as DbCustomer | null,
+      orders: [] as DbOrder[],
+    };
+  }
+
+  const { data: orders, error: ordersError } = await supabaseServer
+    .from("orders")
+    .select("id, created_at, total_amount, order_status")
+    .eq("user_id", customer.id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (ordersError) {
+    throw new Error(ordersError.message);
+  }
+
+  return {
+    customer: customer as DbCustomer,
+    orders: (orders ?? []) as DbOrder[],
+  };
+}
+
+function buildOrdersMessage(params: {
+  lang: BotLang;
+  customerName?: string | null;
+  orders: DbOrder[];
+}) {
+  const { lang, customerName, orders } = params;
+
+  if (!orders.length) {
+    return lang === "uz"
+      ? "Sizda hozircha buyurtmalar yo‘q."
+      : "У вас пока нет заказов.";
+  }
+
+  const title = lang === "uz" ? "📦 Buyurtmalaringiz" : "📦 Ваши заказы";
+
+  const ownerLine = customerName
+    ? lang === "uz"
+      ? `Mijoz: ${customerName}`
+      : `Клиент: ${customerName}`
+    : null;
+
+  const rows = orders.map((order, index) => {
+    const dateText = new Date(order.created_at).toLocaleString(
+      lang === "ru" ? "ru-RU" : "uz-UZ"
+    );
+
+    const statusText =
+      order.order_status || (lang === "uz" ? "Noma’lum" : "Неизвестно");
+
+    return [
+      `${index + 1}) #${order.id}`,
+      lang === "uz" ? `📅 Sana: ${dateText}` : `📅 Дата: ${dateText}`,
+      lang === "uz"
+        ? `💵 Jami: $${Number(order.total_amount || 0)}`
+        : `💵 Сумма: $${Number(order.total_amount || 0)}`,
+      lang === "uz"
+        ? `📌 Holat: ${statusText}`
+        : `📌 Статус: ${statusText}`,
+    ].join("\n");
+  });
+
+  return [title, ownerLine, "", ...rows].filter(Boolean).join("\n\n");
+}
+
 
 function getTelegramProfileLang(update: any): BotLang {
   const code =
@@ -268,15 +370,51 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-      if (action === "myOrders") {
-        await sendTelegram("sendMessage", {
-          chat_id: chatId,
-          text: getText(lang, "ordersEmpty"),
-          reply_markup: backInlineKeyboard(lang),
-        });
+     if (action === "myOrders") {
+  const telegramUserId = getTelegramUserId(update);
 
-        return NextResponse.json({ ok: true });
-      }
+  if (!telegramUserId) {
+    await sendTelegram("sendMessage", {
+      chat_id: chatId,
+      text:
+        lang === "uz"
+          ? "Telegram foydalanuvchi ID topilmadi."
+          : "Не удалось определить Telegram user ID.",
+      reply_markup: backInlineKeyboard(lang),
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  const { customer, orders } = await getCustomerOrdersByTelegramUser(
+    telegramUserId
+  );
+
+  if (!customer) {
+    await sendTelegram("sendMessage", {
+      chat_id: chatId,
+      text:
+        lang === "uz"
+          ? "Profil topilmadi. Avval Mini App ichida profilingizni to‘ldiring va buyurtma bering."
+          : "Профиль не найден. Сначала заполните профиль в Mini App и оформите заказ.",
+      reply_markup: backInlineKeyboard(lang),
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  await sendTelegram("sendMessage", {
+    chat_id: chatId,
+    text: buildOrdersMessage({
+      lang,
+      customerName: customer.full_name,
+      orders,
+    }),
+    reply_markup: backInlineKeyboard(lang),
+  });
+
+  return NextResponse.json({ ok: true });
+}
 
       if (action === "callOperator") {
         await sendTelegram("sendMessage", {
