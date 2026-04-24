@@ -67,6 +67,7 @@ export default function CheckoutPage() {
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingUser, setCheckingUser] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   const [savedUser, setSavedUser] = useState<SavedUser | null>(null);
   const [address, setAddress] = useState("");
@@ -101,6 +102,35 @@ export default function CheckoutPage() {
     }
   }, [router]);
 
+  function handleGetLocation() {
+    if (!navigator.geolocation) {
+      alert("Brauzeringiz lokatsiyani qo'llab-quvvatlamaydi.");
+      return;
+    }
+
+    setLocationLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+        setAddress(mapsLink);
+        setLocationLoading(false);
+      },
+      (error) => {
+        console.error("Location error:", error);
+        alert("Lokatsiyani olish uchun ruxsat berishingiz kerak.");
+        setLocationLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -115,7 +145,7 @@ export default function CheckoutPage() {
     }
 
     if (!address.trim()) {
-      alert("Manzilni kiriting yoki tasdiqlang");
+      alert("Manzilni kiriting yoki lokatsiyani yuboring");
       return;
     }
 
@@ -242,7 +272,7 @@ export default function CheckoutPage() {
           <h1 className="text-2xl font-bold text-marva-900">Checkout</h1>
           <p className="mt-1 text-sm text-marva-700/70">
             Buyurtma profilingiz asosida yuboriladi. Manzilni tasdiqlang yoki
-            o'zgartiring.
+            lokatsiyangizni yuboring.
           </p>
         </div>
 
@@ -284,16 +314,29 @@ export default function CheckoutPage() {
               <label className="mb-2 block text-sm font-medium text-marva-900">
                 Yetkazib berish manzili
               </label>
+
               <textarea
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="Manzilni kiriting"
+                placeholder="Manzilni kiriting yoki lokatsiyani yuboring"
                 rows={4}
                 className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
               />
+
+              <button
+                type="button"
+                onClick={handleGetLocation}
+                disabled={locationLoading}
+                className="mt-3 w-full rounded-2xl bg-marva-700 px-4 py-3 font-semibold text-white shadow-sm disabled:opacity-60"
+              >
+                {locationLoading
+                  ? "Lokatsiya olinmoqda..."
+                  : "📍 Lokatsiyani yuborish"}
+              </button>
+
               <p className="mt-2 text-xs text-marva-700/70">
-                Profilingizdagi manzil avtomatik qo'yildi. Kerak bo'lsa shu
-                yerda o'zgartiring.
+                Knopkani bosing va lokatsiyaga ruxsat bering. Google Maps link
+                avtomatik qo'yiladi.
               </p>
             </div>
 
@@ -312,9 +355,10 @@ export default function CheckoutPage() {
               </p>
             </div>
 
-<div className="fixed bottom-24 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">              <button
+            <div className="fixed bottom-24 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">
+              <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || locationLoading}
                 className="w-full rounded-[20px] bg-marva-700 px-4 py-4 font-semibold text-white shadow-lg disabled:opacity-60"
               >
                 {loading ? "Yuborilmoqda..." : "Buyurtmani yuborish"}
