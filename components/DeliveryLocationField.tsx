@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 
 type DeliveryLocationFieldProps = {
   address: string;
-  setAddress: (value: string) => void;
+  setAddressAction: (value: string) => void;
   latitude: number | null;
-  setLatitude: (value: number | null) => void;
+  setLatitudeAction: (value: number | null) => void;
   longitude: number | null;
-  setLongitude: (value: number | null) => void;
+  setLongitudeAction: (value: number | null) => void;
 };
 
 type TelegramLocationData = {
@@ -26,21 +26,6 @@ type TelegramLocationData = {
 declare global {
   interface Window {
     L?: any;
-    Telegram?: {
-      WebApp?: {
-        LocationManager?: {
-          isInited?: boolean;
-          isLocationAvailable?: boolean;
-          isAccessRequested?: boolean;
-          isAccessGranted?: boolean;
-          init?: (callback?: () => void) => void;
-          getLocation?: (
-            callback: (locationData: TelegramLocationData | null) => void
-          ) => void;
-          openSettings?: () => void;
-        };
-      };
-    };
   }
 }
 
@@ -53,7 +38,12 @@ function makeYandexMapLink(lat: number, lng: number) {
 
 function getTelegramLocation(): Promise<TelegramLocationData> {
   return new Promise((resolve, reject) => {
-    const locationManager = window.Telegram?.WebApp?.LocationManager;
+    if (typeof window === "undefined") {
+      reject(new Error("Window mavjud emas."));
+      return;
+    }
+
+    const locationManager = (window as any).Telegram?.WebApp?.LocationManager;
 
     if (!locationManager?.init || !locationManager?.getLocation) {
       reject(new Error("Telegram LocationManager mavjud emas."));
@@ -61,14 +51,16 @@ function getTelegramLocation(): Promise<TelegramLocationData> {
     }
 
     const requestLocation = () => {
-      locationManager.getLocation?.((locationData) => {
-        if (!locationData) {
-          reject(new Error("Telegram lokatsiyaga ruxsat bermadi."));
-          return;
-        }
+      locationManager.getLocation(
+        (locationData: TelegramLocationData | null) => {
+          if (!locationData) {
+            reject(new Error("Telegram lokatsiyaga ruxsat bermadi."));
+            return;
+          }
 
-        resolve(locationData);
-      });
+          resolve(locationData);
+        }
+      );
     };
 
     if (locationManager.isInited) {
@@ -76,7 +68,7 @@ function getTelegramLocation(): Promise<TelegramLocationData> {
       return;
     }
 
-    locationManager.init?.(() => {
+    locationManager.init(() => {
       requestLocation();
     });
   });
@@ -84,7 +76,7 @@ function getTelegramLocation(): Promise<TelegramLocationData> {
 
 function getBrowserLocation(): Promise<TelegramLocationData> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
+    if (typeof window === "undefined" || !navigator.geolocation) {
       reject(new Error("Brauzer lokatsiyani qo'llab-quvvatlamaydi."));
       return;
     }
@@ -97,7 +89,9 @@ function getBrowserLocation(): Promise<TelegramLocationData> {
           horizontal_accuracy: position.coords.accuracy,
         });
       },
-      reject,
+      (error) => {
+        reject(error);
+      },
       {
         enableHighAccuracy: true,
         timeout: 15000,
@@ -109,11 +103,11 @@ function getBrowserLocation(): Promise<TelegramLocationData> {
 
 export default function DeliveryLocationField({
   address,
-  setAddress,
+  setAddressAction,
   latitude,
-  setLatitude,
+  setLatitudeAction,
   longitude,
-  setLongitude,
+  setLongitudeAction,
 }: DeliveryLocationFieldProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -131,11 +125,11 @@ export default function DeliveryLocationField({
     lng: number,
     horizontalAccuracy?: number
   ) => {
-    setLatitude(lat);
-    setLongitude(lng);
+    setLatitudeAction(lat);
+    setLongitudeAction(lng);
 
     const mapLink = makeYandexMapLink(lat, lng);
-    setAddress(mapLink);
+    setAddressAction(mapLink);
 
     if (horizontalAccuracy && horizontalAccuracy > 100) {
       setLocationWarning(
@@ -230,7 +224,7 @@ export default function DeliveryLocationField({
     }, 300);
 
     if (!address && latitude && longitude) {
-      setAddress(makeYandexMapLink(latitude, longitude));
+      setAddressAction(makeYandexMapLink(latitude, longitude));
     }
   }, [mapReady]);
 

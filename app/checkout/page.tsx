@@ -311,14 +311,14 @@ export default function CheckoutPage() {
                 Yetkazib berish manzili
               </label>
 
-              <DeliveryLocationField
-                address={address}
-                setAddress={setAddress}
-                latitude={latitude}
-                setLatitude={setLatitude}
-                longitude={longitude}
-                setLongitude={setLongitude}
-              />
+             <DeliveryLocationField
+  address={address}
+  setAddressAction={setAddress}
+  latitude={latitude}
+  setLatitudeAction={setLatitude}
+  longitude={longitude}
+  setLongitudeAction={setLongitude}
+/>
             </div>
 
             <textarea
