@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAppLang } from "@/components/common/LangProvider";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
+import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
   User,
@@ -36,6 +37,22 @@ type MenuItemProps = {
   onClick?: () => void;
 };
 
+function getAddressSubtitle(address?: string, lang: string = "uz") {
+  if (!address) {
+    return lang === "uz" ? "Manzil kiritilmagan" : "Адрес не указан";
+  }
+
+  if (address.includes("yandex") || address.includes("maps") || address.includes("google")) {
+    return lang === "uz" ? "📍 Lokatsiya saqlangan" : "📍 Локация сохранена";
+  }
+
+  if (address.length > 32) {
+    return `${address.slice(0, 32)}...`;
+  }
+
+  return address;
+}
+
 function MenuItem({ icon, title, subtitle, value, onClick }: MenuItemProps) {
   return (
     <button
@@ -51,7 +68,9 @@ function MenuItem({ icon, title, subtitle, value, onClick }: MenuItemProps) {
           {title}
         </div>
         {subtitle ? (
-          <div className="mt-1 text-sm text-[#9CA3AF]">{subtitle}</div>
+          <div className="mt-1 max-w-[230px] truncate text-sm text-[#9CA3AF]">
+            {subtitle}
+          </div>
         ) : null}
       </div>
 
@@ -87,7 +106,10 @@ function SectionCard({
 export default function ProfilePage() {
   const router = useRouter();
   const { lang, mounted } = useAppLang();
+
   const [user, setUser] = useState<SavedUser | null>(null);
+  const [ordersCount, setOrdersCount] = useState(0);
+  const [ordersCountLoading, setOrdersCountLoading] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("marva-user");
@@ -104,6 +126,62 @@ export default function ProfilePage() {
       router.push("/auth");
     }
   }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchOrdersCount = async () => {
+      setOrdersCountLoading(true);
+
+      const candidates: { column: string; value: string | number }[] = [];
+
+      if (user.telegramId) {
+        candidates.push(
+          { column: "telegram_id", value: user.telegramId },
+          { column: "telegramId", value: user.telegramId },
+          { column: "customer_telegram_id", value: user.telegramId }
+        );
+      }
+
+      if (user.phone) {
+        candidates.push(
+          { column: "phone", value: user.phone },
+          { column: "customer_phone", value: user.phone },
+          { column: "customerPhone", value: user.phone }
+        );
+      }
+
+      if (user.telegramUsername) {
+        const username = user.telegramUsername.startsWith("@")
+          ? user.telegramUsername
+          : `@${user.telegramUsername}`;
+
+        candidates.push(
+          { column: "telegram_username", value: username },
+          { column: "telegramUsername", value: username },
+          { column: "customer_telegram_username", value: username }
+        );
+      }
+
+      let maxCount = 0;
+
+      for (const candidate of candidates) {
+        const { count, error } = await supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq(candidate.column, candidate.value);
+
+        if (!error && typeof count === "number") {
+          maxCount = Math.max(maxCount, count);
+        }
+      }
+
+      setOrdersCount(maxCount);
+      setOrdersCountLoading(false);
+    };
+
+    fetchOrdersCount();
+  }, [user]);
 
   const handleLogout = () => {
     localStorage.removeItem("marva-user");
@@ -193,7 +271,7 @@ export default function ProfilePage() {
           <MenuItem
             icon={<Package size={24} />}
             title={lang === "uz" ? "Buyurtmalarim" : "Мои заказы"}
-            value={0}
+            value={ordersCountLoading ? "..." : ordersCount}
             onClick={() => router.push("/orders")}
           />
 
@@ -232,10 +310,7 @@ export default function ProfilePage() {
           <MenuItem
             icon={<MapPin size={24} />}
             title={lang === "uz" ? "Manzillarim" : "Мои адреса"}
-            subtitle={
-              user.address ||
-              (lang === "uz" ? "Manzil kiritilmagan" : "Адрес не указан")
-            }
+            subtitle={getAddressSubtitle(user.address, lang)}
             onClick={() => router.push("/addresses")}
           />
         </SectionCard>
