@@ -311,7 +311,7 @@ export default function CheckoutPage() {
                 Yetkazib berish manzili
               </label>
 
-             <DeliveryLocationField
+          <DeliveryLocationField
   address={address}
   setAddressAction={setAddress}
   latitude={latitude}

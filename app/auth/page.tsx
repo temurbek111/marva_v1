@@ -568,13 +568,13 @@ export default function AuthPage() {
               </label>
 
               <DeliveryLocationField
-                address={address}
-                setAddressAction={setAddress}
-                latitude={latitude}
-                setLatitudeAction={setLatitude}
-                longitude={longitude}
-                setLongitudeAction={setLongitude}
-              />
+  address={address}
+  setAddressAction={setAddress}
+  latitude={latitude}
+  setLatitudeAction={setLatitude}
+  longitude={longitude}
+  setLongitudeAction={setLongitude}
+/>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

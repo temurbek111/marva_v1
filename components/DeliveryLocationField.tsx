@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type DeliveryLocationFieldProps = {
   address: string;
@@ -36,35 +36,35 @@ function makeYandexMapLink(lat: number, lng: number) {
   return `https://yandex.uz/maps/?ll=${lng}%2C${lat}&z=17&pt=${lng},${lat},pm2rdm`;
 }
 
-function splitAddressValue(value: string) {
-  const raw = String(value || "").trim();
+function extractMapLink(value: string) {
+  const match = String(value || "").match(/https:\/\/yandex\.uz\/maps\/[^\s]+/);
+  return match ? match[0] : "";
+}
 
-  if (!raw) {
-    return {
-      manualAddress: "",
-      mapLink: "",
-    };
-  }
+function extractManualAddress(value: string) {
+  const raw = String(value || "");
+  const mapLink = extractMapLink(raw);
 
-  const lines = raw
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  if (!mapLink) return raw.trim();
 
-  const mapLinkLine =
-    lines.find((line) => line.includes("https://yandex.uz/maps/")) || "";
-
-  const manualLines = lines.filter((line) => line !== mapLinkLine);
-
-  return {
-    manualAddress: manualLines.join("\n"),
-    mapLink: mapLinkLine,
-  };
+  return raw
+    .replace(`Xarita: ${mapLink}`, "")
+    .replace(mapLink, "")
+    .trim();
 }
 
 function combineAddressValue(manualAddress: string, mapLink: string) {
-  const parts = [manualAddress.trim(), mapLink.trim()].filter(Boolean);
-  return parts.join("\n");
+  const manual = manualAddress.trim();
+  const link = mapLink.trim();
+
+  if (manual && link) {
+    return `${manual}\nXarita: ${link}`;
+  }
+
+  if (manual) return manual;
+  if (link) return link;
+
+  return "";
 }
 
 function getTelegramLocation(): Promise<TelegramLocationData> {
@@ -144,34 +144,19 @@ export default function DeliveryLocationField({
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
 
-  const initialAddressState = useMemo(() => splitAddressValue(address), [address]);
-
-  const [manualAddress, setManualAddress] = useState(
-    initialAddressState.manualAddress
-  );
-  const [mapLink, setMapLink] = useState(initialAddressState.mapLink);
-
   const [mapReady, setMapReady] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [locationWarning, setLocationWarning] = useState("");
+  const [manualAddress, setManualAddress] = useState("");
+  const [selectedMapLink, setSelectedMapLink] = useState("");
 
   const selectedLat = latitude ?? DEFAULT_LAT;
   const selectedLng = longitude ?? DEFAULT_LNG;
 
-  useEffect(() => {
-    const parsed = splitAddressValue(address);
-
-    setManualAddress(parsed.manualAddress);
-    setMapLink(parsed.mapLink);
-  }, [address]);
-
-  useEffect(() => {
-    const combined = combineAddressValue(manualAddress, mapLink);
-
-    if (combined !== address) {
-      setAddressAction(combined);
-    }
-  }, [manualAddress, mapLink, address, setAddressAction]);
+  const syncAddress = (manual: string, mapLink: string) => {
+    setAddressAction(combineAddressValue(manual, mapLink));
+  };
 
   const updateLocation = (
     lat: number,
@@ -181,8 +166,9 @@ export default function DeliveryLocationField({
     setLatitudeAction(lat);
     setLongitudeAction(lng);
 
-    const nextMapLink = makeYandexMapLink(lat, lng);
-    setMapLink(nextMapLink);
+    const mapLink = makeYandexMapLink(lat, lng);
+    setSelectedMapLink(mapLink);
+    syncAddress(manualAddress, mapLink);
 
     if (horizontalAccuracy && horizontalAccuracy > 100) {
       setLocationWarning(
@@ -202,6 +188,14 @@ export default function DeliveryLocationField({
       mapInstanceRef.current.setView([lat, lng], 17);
     }
   };
+
+  useEffect(() => {
+    const externalManualAddress = extractManualAddress(address);
+    const externalMapLink = extractMapLink(address);
+
+    setManualAddress(externalManualAddress);
+    setSelectedMapLink(externalMapLink);
+  }, [address]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -239,11 +233,24 @@ export default function DeliveryLocationField({
   }, []);
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current || !window.L || mapInstanceRef.current) {
+    if (!mapOpen || !mapReady || !mapRef.current || !window.L) {
       return;
     }
 
     const L = window.L;
+
+    if (mapInstanceRef.current) {
+      setTimeout(() => {
+        mapInstanceRef.current.invalidateSize();
+        mapInstanceRef.current.setView([selectedLat, selectedLng], 17);
+
+        if (markerRef.current) {
+          markerRef.current.setLatLng([selectedLat, selectedLng]);
+        }
+      }, 250);
+
+      return;
+    }
 
     const map = L.map(mapRef.current, {
       center: [selectedLat, selectedLng],
@@ -275,11 +282,15 @@ export default function DeliveryLocationField({
     setTimeout(() => {
       map.invalidateSize();
     }, 300);
+  }, [mapOpen, mapReady, selectedLat, selectedLng]);
 
-    if (!mapLink && latitude && longitude) {
-      setMapLink(makeYandexMapLink(latitude, longitude));
-    }
-  }, [mapReady]);
+  const handleManualAddressChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const value = e.target.value;
+    setManualAddress(value);
+    syncAddress(value, selectedMapLink);
+  };
 
   const handleGetMyLocation = async () => {
     setLoadingLocation(true);
@@ -312,44 +323,58 @@ export default function DeliveryLocationField({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-        <label className="mb-2 block text-xs text-[#5D7E78]">
-          Qo'lda manzil kiriting
+      <div>
+        <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+          Manzilni qo'lda kiriting
         </label>
 
         <textarea
           value={manualAddress}
-          onChange={(e) => setManualAddress(e.target.value)}
-          placeholder="Masalan: Toshkent shahar, Chilonzor tumani, 19-kvartal, 12-uy"
+          onChange={handleManualAddressChange}
+          placeholder="Masalan: Toshkent sh., Chilonzor tumani, 12-kvartal, 5-uy"
           rows={3}
-          className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 outline-none"
+          className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none"
         />
-
-        <p className="mt-2 text-xs leading-5 text-[#5D7E78]">
-          Manzilni matn ko‘rinishida yozing. Xohlasangiz pastdagi xaritadan ham
-          aniq lokatsiyani belgilang.
-        </p>
-      </div>
-
-      <div className="overflow-hidden rounded-[22px] border border-black/5 bg-white shadow-sm">
-        <div ref={mapRef} className="h-[260px] w-full" />
       </div>
 
       <button
         type="button"
-        onClick={handleGetMyLocation}
-        disabled={loadingLocation}
-        className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[#12332D] shadow-sm disabled:opacity-60"
+        onClick={() => setMapOpen((prev) => !prev)}
+        className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[#12332D] shadow-sm"
       >
-        {loadingLocation
-          ? "Lokatsiya olinmoqda..."
-          : "📍 Mening lokatsiyamni yuborish"}
+        {mapOpen ? "🗺 Kartani yopish" : "🗺 Kartani ochish"}
       </button>
 
-      {mapLink ? (
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800 break-all">
-          <div className="mb-1 font-semibold">Saqlanadigan xarita linki:</div>
-          {mapLink}
+      {mapOpen ? (
+        <>
+          <div className="overflow-hidden rounded-[22px] border border-black/5 bg-white shadow-sm">
+            <div ref={mapRef} className="h-[260px] w-full" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGetMyLocation}
+            disabled={loadingLocation}
+            className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[#12332D] shadow-sm disabled:opacity-60"
+          >
+            {loadingLocation
+              ? "Lokatsiya olinmoqda..."
+              : "📍 Mening lokatsiyamni yuborish"}
+          </button>
+        </>
+      ) : null}
+
+      {selectedMapLink ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800">
+          <div className="font-semibold">Tanlangan xarita linki:</div>
+          <a
+            href={selectedMapLink}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 block break-all underline"
+          >
+            {selectedMapLink}
+          </a>
         </div>
       ) : null}
 
@@ -360,8 +385,8 @@ export default function DeliveryLocationField({
       ) : null}
 
       <p className="text-xs leading-5 text-[#5D7E78]">
-        Kartadan joyni tanlang yoki pinni sudrang. Tanlangan joy buyurtmaga
-        xarita linki sifatida saqlanadi.
+        Manzilni qo'lda yozishingiz mumkin. Agar xohlasangiz, "Kartani ochish"
+        tugmasini bosib xaritadan aniq joyni tanlang yoki pinni sudrang.
       </p>
     </div>
   );
