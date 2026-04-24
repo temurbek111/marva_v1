@@ -6,6 +6,7 @@ import { Container } from "@/components/ui/Container";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { ProductCard } from "@/components/product/ProductCard";
 import { CatalogFilters } from "./CatalogFilters";
+import { CatalogScrollRestorer } from "@/components/catalog/CatalogScrollRestorer";
 
 const PAGE_SIZE = 24;
 
@@ -28,7 +29,9 @@ async function getProducts(
   searchQuery: string,
   page: number
 ) {
-  if (!supabase) return { products: [], total: 0 };
+  if (!supabase) {
+    return { products: [], total: 0 };
+  }
 
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -59,14 +62,20 @@ async function getProducts(
     return { products: [], total: 0 };
   }
 
-  return { products: data ?? [], total: count ?? 0 };
+  return {
+    products: data ?? [],
+    total: count ?? 0,
+  };
 }
 
 export default async function CatalogPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams;
+
   const useCategory = (resolvedParams.use || "all") as UseCategory;
   const searchQuery = resolvedParams.q?.trim() || "";
-  const page = Math.max(1, parseInt(resolvedParams.page || "1"));
+
+  const parsedPage = Number.parseInt(resolvedParams.page || "1", 10);
+  const page = Number.isNaN(parsedPage) ? 1 : Math.max(1, parsedPage);
 
   const cookieStore = await cookies();
   const lang = cookieStore.get("lang")?.value === "ru" ? "ru" : "uz";
@@ -75,29 +84,38 @@ export default async function CatalogPage({ searchParams }: PageProps) {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const t = {
-    catalog:  lang === "uz" ? "Katalog"                                     : "Каталог",
-    found:    lang === "uz" ? `${total} ta mahsulot topildi`                : `Найдено: ${total}`,
-    products: lang === "uz" ? "Mahsulotlar"                                 : "Товары",
-    subtitle: lang === "uz" ? "Tanlangan filtrlar bo'yicha"                 : "По выбранным фильтрам",
-    notfound: lang === "uz" ? "Mahsulot topilmadi"                          : "Товар не найден",
-    tryother: lang === "uz" ? "Boshqa filter yoki qidiruvni sinab ko'ring"  : "Попробуйте другой фильтр",
-    search:   lang === "uz" ? "Mahsulotlarni qidiring"                      : "Поиск товаров",
-    prev:     lang === "uz" ? "← Oldingi"                                   : "← Назад",
-    next:     lang === "uz" ? "Keyingi →"                                   : "Вперёд →",
-    count:    lang === "uz" ? `${total} ta`                                 : `${total} шт.`,
+    catalog: lang === "uz" ? "Katalog" : "Каталог",
+    found:
+      lang === "uz"
+        ? `${total} ta mahsulot topildi`
+        : `Найдено: ${total}`,
+    products: lang === "uz" ? "Mahsulotlar" : "Товары",
+    subtitle:
+      lang === "uz"
+        ? "Tanlangan filtrlar bo'yicha"
+        : "По выбранным фильтрам",
+    notfound: lang === "uz" ? "Mahsulot topilmadi" : "Товар не найден",
+    tryother:
+      lang === "uz"
+        ? "Boshqa filter yoki qidiruvni sinab ko'ring"
+        : "Попробуйте другой фильтр",
+    search:
+      lang === "uz" ? "Mahsulotlarni qidiring" : "Поиск товаров",
+    prev: lang === "uz" ? "← Oldingi" : "← Назад",
+    next: lang === "uz" ? "Keyingi →" : "Вперёд →",
+    count: lang === "uz" ? `${total} ta` : `${total} шт.`,
   };
 
   const buildHref = (params: Record<string, string>) => {
-    const p = new URLSearchParams(params);
-    const s = p.toString();
-    return s ? `/catalog?${s}` : "/catalog";
+    const search = new URLSearchParams(params).toString();
+    return search ? `/catalog?${search}` : "/catalog";
   };
 
   return (
     <div className="min-h-screen bg-[#EEF3F1] pb-28">
-      <Container className="py-4">
+      <CatalogScrollRestorer />
 
-        {/* Header */}
+      <Container className="py-4">
         <div className="rounded-[28px] bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
           <div className="flex items-center gap-3">
             <Link
@@ -107,10 +125,15 @@ export default async function CatalogPage({ searchParams }: PageProps) {
               <ArrowLeft size={22} />
             </Link>
 
-            <form action="/catalog" method="GET" className="flex flex-1 items-center gap-3">
+            <form
+              action="/catalog"
+              method="GET"
+              className="flex flex-1 items-center gap-3"
+            >
               {useCategory !== "all" && (
                 <input type="hidden" name="use" value={useCategory} />
               )}
+
               <div className="flex min-h-[56px] flex-1 items-center gap-3 rounded-[18px] bg-[#F4F7F6] px-4">
                 <Search size={20} className="text-[#6D8781]" />
                 <input
@@ -126,25 +149,28 @@ export default async function CatalogPage({ searchParams }: PageProps) {
 
           <div className="mt-4">
             <p className="text-sm text-[#6D8781]">MARVA Dental market</p>
-            <h1 className="mt-1 text-[30px] font-bold text-[#12332D]">{t.catalog}</h1>
+            <h1 className="mt-1 text-[30px] font-bold text-[#12332D]">
+              {t.catalog}
+            </h1>
             <p className="mt-1 text-sm text-[#5D7E78]">{t.found}</p>
           </div>
         </div>
 
-        {/* Filters — client component */}
         <CatalogFilters
           activeUse={useCategory}
           searchQuery={searchQuery}
           lang={lang}
         />
 
-        {/* Products */}
         <div className="mt-6 rounded-[28px] bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-[22px] font-bold text-[#12332D]">{t.products}</h3>
+              <h3 className="text-[22px] font-bold text-[#12332D]">
+                {t.products}
+              </h3>
               <p className="mt-1 text-sm text-[#5D7E78]">{t.subtitle}</p>
             </div>
+
             <div className="rounded-full bg-[#F4F7F6] px-3 py-2 text-xs font-semibold text-[#12332D]">
               {t.count}
             </div>
@@ -152,7 +178,9 @@ export default async function CatalogPage({ searchParams }: PageProps) {
 
           {products.length === 0 ? (
             <div className="mt-5 rounded-[22px] bg-[#F8FBFA] p-6 text-center">
-              <p className="text-base font-semibold text-[#12332D]">{t.notfound}</p>
+              <p className="text-base font-semibold text-[#12332D]">
+                {t.notfound}
+              </p>
               <p className="mt-2 text-sm text-[#5D7E78]">{t.tryother}</p>
             </div>
           ) : (
@@ -163,13 +191,18 @@ export default async function CatalogPage({ searchParams }: PageProps) {
                   product={{
                     id: String(product.id),
                     slug: `product-${product.id}`,
-                    categoryId: product.category_id ? String(product.category_id) : "",
+                    categoryId: product.category_id
+                      ? String(product.category_id)
+                      : "",
                     name: product.name || "Nomsiz mahsulot",
                     price: Number(product.price || 0),
-                    oldPrice: product.old_price ? Number(product.old_price) : undefined,
+                    oldPrice: product.old_price
+                      ? Number(product.old_price)
+                      : undefined,
                     currency: "USD",
                     image: product.images?.[0] || product.image_url || "",
-                    shortDescription: product.description || "Dental mahsulot",
+                    shortDescription:
+                      product.description || "Dental mahsulot",
                     description: product.description || "Dental mahsulot",
                     stock: Number(product.stock || 0),
                     featured: Boolean(product.is_featured),
@@ -179,7 +212,6 @@ export default async function CatalogPage({ searchParams }: PageProps) {
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-center gap-3">
               {page > 1 && (
@@ -194,9 +226,11 @@ export default async function CatalogPage({ searchParams }: PageProps) {
                   {t.prev}
                 </Link>
               )}
+
               <span className="rounded-full bg-[#004F45] px-4 py-2 text-sm font-semibold text-white">
                 {page} / {totalPages}
               </span>
+
               {page < totalPages && (
                 <Link
                   href={buildHref({
@@ -212,8 +246,8 @@ export default async function CatalogPage({ searchParams }: PageProps) {
             </div>
           )}
         </div>
-
       </Container>
+
       <BottomNav />
     </div>
   );
