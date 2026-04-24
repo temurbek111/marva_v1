@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type DeliveryLocationFieldProps = {
   address: string;
@@ -34,6 +34,37 @@ const DEFAULT_LNG = 69.240562;
 
 function makeYandexMapLink(lat: number, lng: number) {
   return `https://yandex.uz/maps/?ll=${lng}%2C${lat}&z=17&pt=${lng},${lat},pm2rdm`;
+}
+
+function splitAddressValue(value: string) {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return {
+      manualAddress: "",
+      mapLink: "",
+    };
+  }
+
+  const lines = raw
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const mapLinkLine =
+    lines.find((line) => line.includes("https://yandex.uz/maps/")) || "";
+
+  const manualLines = lines.filter((line) => line !== mapLinkLine);
+
+  return {
+    manualAddress: manualLines.join("\n"),
+    mapLink: mapLinkLine,
+  };
+}
+
+function combineAddressValue(manualAddress: string, mapLink: string) {
+  const parts = [manualAddress.trim(), mapLink.trim()].filter(Boolean);
+  return parts.join("\n");
 }
 
 function getTelegramLocation(): Promise<TelegramLocationData> {
@@ -113,12 +144,34 @@ export default function DeliveryLocationField({
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
 
+  const initialAddressState = useMemo(() => splitAddressValue(address), [address]);
+
+  const [manualAddress, setManualAddress] = useState(
+    initialAddressState.manualAddress
+  );
+  const [mapLink, setMapLink] = useState(initialAddressState.mapLink);
+
   const [mapReady, setMapReady] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [locationWarning, setLocationWarning] = useState("");
 
   const selectedLat = latitude ?? DEFAULT_LAT;
   const selectedLng = longitude ?? DEFAULT_LNG;
+
+  useEffect(() => {
+    const parsed = splitAddressValue(address);
+
+    setManualAddress(parsed.manualAddress);
+    setMapLink(parsed.mapLink);
+  }, [address]);
+
+  useEffect(() => {
+    const combined = combineAddressValue(manualAddress, mapLink);
+
+    if (combined !== address) {
+      setAddressAction(combined);
+    }
+  }, [manualAddress, mapLink, address, setAddressAction]);
 
   const updateLocation = (
     lat: number,
@@ -128,8 +181,8 @@ export default function DeliveryLocationField({
     setLatitudeAction(lat);
     setLongitudeAction(lng);
 
-    const mapLink = makeYandexMapLink(lat, lng);
-    setAddressAction(mapLink);
+    const nextMapLink = makeYandexMapLink(lat, lng);
+    setMapLink(nextMapLink);
 
     if (horizontalAccuracy && horizontalAccuracy > 100) {
       setLocationWarning(
@@ -223,8 +276,8 @@ export default function DeliveryLocationField({
       map.invalidateSize();
     }, 300);
 
-    if (!address && latitude && longitude) {
-      setAddressAction(makeYandexMapLink(latitude, longitude));
+    if (!mapLink && latitude && longitude) {
+      setMapLink(makeYandexMapLink(latitude, longitude));
     }
   }, [mapReady]);
 
@@ -259,6 +312,25 @@ export default function DeliveryLocationField({
 
   return (
     <div className="space-y-3">
+      <div className="rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
+        <label className="mb-2 block text-xs text-[#5D7E78]">
+          Qo'lda manzil kiriting
+        </label>
+
+        <textarea
+          value={manualAddress}
+          onChange={(e) => setManualAddress(e.target.value)}
+          placeholder="Masalan: Toshkent shahar, Chilonzor tumani, 19-kvartal, 12-uy"
+          rows={3}
+          className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 outline-none"
+        />
+
+        <p className="mt-2 text-xs leading-5 text-[#5D7E78]">
+          Manzilni matn ko‘rinishida yozing. Xohlasangiz pastdagi xaritadan ham
+          aniq lokatsiyani belgilang.
+        </p>
+      </div>
+
       <div className="overflow-hidden rounded-[22px] border border-black/5 bg-white shadow-sm">
         <div ref={mapRef} className="h-[260px] w-full" />
       </div>
@@ -273,6 +345,13 @@ export default function DeliveryLocationField({
           ? "Lokatsiya olinmoqda..."
           : "📍 Mening lokatsiyamni yuborish"}
       </button>
+
+      {mapLink ? (
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800 break-all">
+          <div className="mb-1 font-semibold">Saqlanadigan xarita linki:</div>
+          {mapLink}
+        </div>
+      ) : null}
 
       {locationWarning ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
