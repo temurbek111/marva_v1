@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -16,6 +17,26 @@ import { ProductTabs } from "@/components/product/ProductTabs";
 import { supabase } from "@/lib/supabase";
 import { ProductImageGallery } from "@/components/product/ProductImageGallery";
 
+function getBackHrefFromReferer(referer: string | null) {
+  if (!referer) return "/catalog";
+
+  try {
+    const url = new URL(referer);
+
+    if (url.pathname.startsWith("/catalog")) {
+      return `${url.pathname}${url.search}`;
+    }
+
+    return "/catalog";
+  } catch {
+    if (referer.startsWith("/catalog")) {
+      return referer;
+    }
+
+    return "/catalog";
+  }
+}
+
 export default async function ProductDetailPage({
   params,
 }: {
@@ -24,6 +45,10 @@ export default async function ProductDetailPage({
   const { id } = await params;
 
   if (!supabase) return notFound();
+
+  const headersList = await headers();
+  const referer = headersList.get("referer");
+  const backHref = getBackHrefFromReferer(referer);
 
   const { data: product, error } = await supabase
     .from("products")
@@ -52,7 +77,8 @@ export default async function ProductDetailPage({
     image: productImages[0] || "",
     images: productImages,
     shortDescription: product.description || "Dental mahsulot",
-    description: product.full_description || product.description || "Dental mahsulot",
+    description:
+      product.full_description || product.description || "Dental mahsulot",
     stock: Number(product.stock || 0),
     featured: false,
     brand: product.brand || "",
@@ -101,7 +127,7 @@ export default async function ProductDetailPage({
           <div className="relative bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_100%)] px-4 pb-6 pt-4">
             <div className="absolute left-4 top-4 z-20">
               <Link
-                href="/catalog"
+                href={backHref}
                 className="flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-[#12332D] shadow-[0_8px_20px_rgba(0,0,0,0.08)] ring-1 ring-black/5 backdrop-blur"
               >
                 <ArrowLeft size={20} />
@@ -125,7 +151,9 @@ export default async function ProductDetailPage({
             <div className="-mt-3 rounded-[28px] bg-white p-5 shadow-[0_16px_35px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm text-[#5D7E78]">{mappedProduct.shortDescription}</p>
+                  <p className="text-sm text-[#5D7E78]">
+                    {mappedProduct.shortDescription}
+                  </p>
 
                   <h1 className="mt-2 text-[26px] font-bold leading-8 text-[#12332D]">
                     {mappedProduct.name}

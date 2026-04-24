@@ -77,9 +77,17 @@ export function ProductCard({ product }: { product: Product }) {
         };
 
   const openProduct = () => {
-    router.push(`/product/${product.id}`);
-  };
+  if (typeof window !== "undefined") {
+    const currentUrl = window.location.pathname + window.location.search;
 
+    if (currentUrl.startsWith("/catalog")) {
+      sessionStorage.setItem("catalog-scroll-y", String(window.scrollY));
+      sessionStorage.setItem("catalog-return-url", currentUrl);
+    }
+  }
+
+  router.push(`/product/${product.id}`);
+};
   const handleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
     toggleFavorite(mappedProduct);
