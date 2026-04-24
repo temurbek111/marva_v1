@@ -92,6 +92,30 @@ function getStatusLabel(status?: SavedOrder["status"]) {
   };
 }
 
+function isMapLink(value?: string | null) {
+  if (!value) return false;
+
+  return (
+    value.includes("yandex") ||
+    value.includes("google") ||
+    value.includes("maps")
+  );
+}
+
+function getShortAddress(value?: string | null) {
+  if (!value) return "Manzil yo‘q";
+
+  if (isMapLink(value)) {
+    return "📍 Xaritada ochish";
+  }
+
+  if (value.length > 40) {
+    return `${value.slice(0, 40)}...`;
+  }
+
+  return value;
+}
+
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<SavedOrder[]>([]);
@@ -261,22 +285,38 @@ export default function OrdersPage() {
                   </div>
 
                   {(order.address || order.paymentMethod) && (
-                    <div className="mt-4 space-y-2 text-sm text-[#5D7E78]">
+                    <div className="mt-4 space-y-3 text-sm text-[#5D7E78]">
                       {order.address ? (
-                        <div>
-                          <span className="font-semibold text-[#12332D]">
-                            Manzil:
-                          </span>{" "}
-                          {order.address}
+                        <div className="rounded-[20px] bg-[#F7FAF9] p-3">
+                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6B8A84]">
+                            Manzil
+                          </div>
+
+                          {isMapLink(order.address) ? (
+                            <a
+                              href={order.address}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#004F45] ring-1 ring-black/5"
+                            >
+                              {getShortAddress(order.address)}
+                            </a>
+                          ) : (
+                            <p className="mt-2 line-clamp-2 text-sm font-medium text-[#12332D]">
+                              {getShortAddress(order.address)}
+                            </p>
+                          )}
                         </div>
                       ) : null}
 
                       {order.paymentMethod ? (
-                        <div>
-                          <span className="font-semibold text-[#12332D]">
-                            To‘lov:
-                          </span>{" "}
-                          {order.paymentMethod}
+                        <div className="rounded-[20px] bg-[#F7FAF9] p-3">
+                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6B8A84]">
+                            To‘lov
+                          </div>
+                          <p className="mt-2 text-sm font-medium text-[#12332D]">
+                            {order.paymentMethod}
+                          </p>
                         </div>
                       ) : null}
                     </div>

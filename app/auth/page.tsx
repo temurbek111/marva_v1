@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppLang } from "@/components/common/LangProvider";
 import { Header } from "@/components/layout/Header";
@@ -32,6 +32,13 @@ type CustomerRow = {
   clinic_name: string | null;
 };
 
+type TelegramUser = {
+  id?: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+};
+
 function normalizePhone(value: string) {
   return String(value || "").replace(/[^\d+]/g, "").trim();
 }
@@ -54,7 +61,8 @@ function toLocalUser(data: CustomerRow) {
 export default function AuthPage() {
   const router = useRouter();
   const { lang, mounted } = useAppLang();
-  const tgUser = useMemo(() => getTelegramUser(), []);
+
+  const [tgUser, setTgUser] = useState<TelegramUser | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -70,15 +78,52 @@ export default function AuthPage() {
   const [checkingCustomer, setCheckingCustomer] = useState(true);
 
   useEffect(() => {
+    const loadTelegramUser = () => {
+      const user = getTelegramUser();
+
+      if (!user) return null;
+
+      setTgUser(user);
+
+      const name = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
+
+      if (name) {
+        setFullName(name);
+      }
+
+      if (user.username) {
+        setTelegramUsername(`@${user.username}`);
+      }
+
+      return user;
+    };
+
+    loadTelegramUser();
+
+    const timer = setTimeout(() => {
+      loadTelegramUser();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     const hydrate = async () => {
       const saved = localStorage.getItem("marva-user");
+
       if (saved) {
         router.push("/profile");
         return;
       }
 
-      if (tgUser) {
-        const name = `${tgUser.first_name ?? ""} ${tgUser.last_name ?? ""}`.trim();
+      const currentTgUser = tgUser || getTelegramUser();
+
+      if (currentTgUser) {
+        const name = `${currentTgUser.first_name ?? ""} ${
+          currentTgUser.last_name ?? ""
+        }`.trim();
+
+        setTgUser(currentTgUser);
 
         setFullName(
           name ||
@@ -87,13 +132,15 @@ export default function AuthPage() {
               : "Пользователь Telegram")
         );
 
-        setTelegramUsername(tgUser.username ? `@${tgUser.username}` : "");
+        setTelegramUsername(
+          currentTgUser.username ? `@${currentTgUser.username}` : ""
+        );
 
-        if (supabase && tgUser.id) {
+        if (supabase && currentTgUser.id) {
           const { data, error } = await supabase
             .from("customers")
             .select("*")
-            .eq("telegram_id", Number(tgUser.id))
+            .eq("telegram_id", Number(currentTgUser.id))
             .maybeSingle();
 
           if (!error && data) {
@@ -134,8 +181,13 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      const telegramId = tgUser?.id ? Number(tgUser.id) : null;
+      const currentTgUser = tgUser || getTelegramUser();
+      const telegramId = currentTgUser?.id ? Number(currentTgUser.id) : null;
       const normalizedPhone = normalizePhone(phone);
+
+      const finalTelegramUsername =
+        telegramUsername.trim() ||
+        (currentTgUser?.username ? `@${currentTgUser.username}` : "");
 
       const payload = {
         full_name: fullName.trim(),
@@ -145,9 +197,9 @@ export default function AuthPage() {
         gender: gender || null,
         customer_type: customerType || null,
         clinic_name: clinicName.trim() || null,
-        telegram_username: telegramUsername.trim() || null,
+        telegram_username: finalTelegramUsername || null,
         telegram_id: telegramId,
-        source: tgUser?.id ? "telegram_app" : "app",
+        source: currentTgUser?.id ? "telegram_app" : "app",
       };
 
       let data: CustomerRow | null = null;
@@ -246,8 +298,8 @@ export default function AuthPage() {
             <p className="mt-2 text-sm text-white/80">
               {tgUser?.id
                 ? lang === "uz"
-                  ? `✅ Telegram ulandi: ${tgUser.first_name}`
-                  : `✅ Telegram подключен: ${tgUser.first_name}`
+                  ? `✅ Telegram ulandi: ${tgUser.first_name || "user"}`
+                  : `✅ Telegram подключен: ${tgUser.first_name || "user"}`
                 : lang === "uz"
                 ? "ℹ️ Brauzerda ochilgan"
                 : "ℹ️ Открыто в браузере"}
@@ -396,6 +448,16 @@ export default function AuthPage() {
                 placeholder="@username"
                 className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
               />
+
+              {tgUser?.username ? (
+                <p className="mt-2 text-xs text-[#5D7E78]">
+                  Telegram username avtomatik qo‘yildi.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-[#5D7E78]">
+                  Telegram ichida ochilganda username avtomatik tushadi.
+                </p>
+              )}
             </div>
 
             <button

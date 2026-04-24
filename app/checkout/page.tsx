@@ -7,6 +7,7 @@ import { useCartStore } from "@/lib/store";
 import { formatPrice } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { BottomNav } from "@/components/layout/BottomNav";
+import DeliveryLocationField from "@/components/DeliveryLocationField";
 
 type SavedUser = {
   id?: number;
@@ -60,6 +61,22 @@ function saveOrderToLocalStorage(order: LocalSavedOrder) {
   }
 }
 
+function getCoordinatesFromYandexLink(address: string) {
+  const ptMatch = address.match(/pt=([\d.-]+),([\d.-]+)/);
+
+  if (!ptMatch) {
+    return {
+      latitude: null,
+      longitude: null,
+    };
+  }
+
+  return {
+    longitude: Number(ptMatch[1]),
+    latitude: Number(ptMatch[2]),
+  };
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, clear } = useCartStore();
@@ -67,10 +84,11 @@ export default function CheckoutPage() {
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingUser, setCheckingUser] = useState(true);
-  const [locationLoading, setLocationLoading] = useState(false);
 
   const [savedUser, setSavedUser] = useState<SavedUser | null>(null);
   const [address, setAddress] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [note, setNote] = useState("");
 
   const total = items.reduce(
@@ -96,40 +114,18 @@ export default function CheckoutPage() {
 
       setSavedUser(user);
       setAddress(user.address || "");
+
+      if (user.address) {
+        const coords = getCoordinatesFromYandexLink(user.address);
+        setLatitude(coords.latitude);
+        setLongitude(coords.longitude);
+      }
+
       setCheckingUser(false);
     } catch {
       router.push("/auth");
     }
   }, [router]);
-
-  function handleGetLocation() {
-    if (!navigator.geolocation) {
-      alert("Brauzeringiz lokatsiyani qo'llab-quvvatlamaydi.");
-      return;
-    }
-
-    setLocationLoading(true);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
-
-        setAddress(mapsLink);
-        setLocationLoading(false);
-      },
-      (error) => {
-        console.error("Location error:", error);
-        alert("Lokatsiyani olish uchun ruxsat berishingiz kerak.");
-        setLocationLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -272,7 +268,7 @@ export default function CheckoutPage() {
           <h1 className="text-2xl font-bold text-marva-900">Checkout</h1>
           <p className="mt-1 text-sm text-marva-700/70">
             Buyurtma profilingiz asosida yuboriladi. Manzilni tasdiqlang yoki
-            lokatsiyangizni yuboring.
+            kartadan lokatsiyangizni tanlang.
           </p>
         </div>
 
@@ -315,29 +311,14 @@ export default function CheckoutPage() {
                 Yetkazib berish manzili
               </label>
 
-              <textarea
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Manzilni kiriting yoki lokatsiyani yuboring"
-                rows={4}
-                className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
+              <DeliveryLocationField
+                address={address}
+                setAddress={setAddress}
+                latitude={latitude}
+                setLatitude={setLatitude}
+                longitude={longitude}
+                setLongitude={setLongitude}
               />
-
-              <button
-                type="button"
-                onClick={handleGetLocation}
-                disabled={locationLoading}
-                className="mt-3 w-full rounded-2xl bg-marva-700 px-4 py-3 font-semibold text-white shadow-sm disabled:opacity-60"
-              >
-                {locationLoading
-                  ? "Lokatsiya olinmoqda..."
-                  : "📍 Lokatsiyani yuborish"}
-              </button>
-
-              <p className="mt-2 text-xs text-marva-700/70">
-                Knopkani bosing va lokatsiyaga ruxsat bering. Google Maps link
-                avtomatik qo'yiladi.
-              </p>
             </div>
 
             <textarea
@@ -358,7 +339,7 @@ export default function CheckoutPage() {
             <div className="fixed bottom-24 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">
               <button
                 type="submit"
-                disabled={loading || locationLoading}
+                disabled={loading}
                 className="w-full rounded-[20px] bg-marva-700 px-4 py-4 font-semibold text-white shadow-lg disabled:opacity-60"
               >
                 {loading ? "Yuborilmoqda..." : "Buyurtmani yuborish"}
