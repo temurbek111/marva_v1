@@ -48,6 +48,30 @@ type OrderUpdatePayload = Partial<{
   delivery_note: string;
 }>;
 
+function isMapLink(value?: string | null) {
+  if (!value) return false;
+
+  return (
+    value.includes("yandex") ||
+    value.includes("google") ||
+    value.includes("maps")
+  );
+}
+
+function getShortAddress(value?: string | null) {
+  if (!value) return "Manzil yo‘q";
+
+  if (isMapLink(value)) {
+    return "📍 Xaritada ochish";
+  }
+
+  if (value.length > 42) {
+    return `${value.slice(0, 42)}...`;
+  }
+
+  return value;
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -518,20 +542,46 @@ export default function AdminOrdersPage() {
                   className="rounded-[24px] bg-white p-5 shadow-soft"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="text-lg font-bold text-marva-900">
                         #{order.id} — {order.full_name}
                       </p>
-                      <p className="mt-1 text-sm text-marva-700/80">{order.phone}</p>
-                      <p className="mt-1 text-sm text-marva-700/80">{order.address}</p>
+
+                      <p className="mt-1 text-sm text-marva-700/80">
+                        {order.phone}
+                      </p>
+
+                      <div className="mt-2">
+                        {order.address ? (
+                          isMapLink(order.address) ? (
+                            <a
+                              href={order.address}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex rounded-full bg-marva-50 px-3 py-2 text-xs font-semibold text-marva-700 ring-1 ring-black/5"
+                            >
+                              {getShortAddress(order.address)}
+                            </a>
+                          ) : (
+                            <p className="max-w-full truncate text-sm text-marva-700/80">
+                              {getShortAddress(order.address)}
+                            </p>
+                          )
+                        ) : (
+                          <p className="text-sm text-marva-700/60">
+                            Manzil yo‘q
+                          </p>
+                        )}
+                      </div>
+
                       {order.note ? (
-                        <p className="mt-2 text-sm text-marva-700/80">
+                        <p className="mt-2 line-clamp-2 text-sm text-marva-700/80">
                           Mijoz izohi: {order.note}
                         </p>
                       ) : null}
                     </div>
 
-                    <div className="text-right">
+                    <div className="shrink-0 text-right">
                       <p className="text-xl font-bold text-marva-900">
                         {formatPrice(order.total_amount)}
                       </p>
