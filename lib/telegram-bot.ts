@@ -26,6 +26,7 @@ function buildItemsText(items: TelegramOrderItem[]) {
       const name = item.product_name || "Nomsiz mahsulot";
       const quantity = Number(item.quantity ?? 0);
       const price = item.price ?? 0;
+
       return `${index + 1}. ${name} — ${quantity} dona — ${price}`;
     })
     .join("\n");
@@ -59,6 +60,29 @@ export async function telegramBot(
   return data;
 }
 
+function orderActionKeyboard(orderId: string) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "🚚 Kuryerga berish",
+          callback_data: `order:courier:${orderId}`,
+        },
+        {
+          text: "✅ Yetkazildi",
+          callback_data: `order:delivered:${orderId}`,
+        },
+      ],
+      [
+        {
+          text: "🗑 O‘chirib tashlash",
+          callback_data: `order:delete:${orderId}`,
+        },
+      ],
+    ],
+  };
+}
+
 export async function sendTelegramAdminOrder(params: TelegramOrderPayload) {
   const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
 
@@ -69,7 +93,7 @@ export async function sendTelegramAdminOrder(params: TelegramOrderPayload) {
   const itemsText = buildItemsText(params.items);
 
   const text = [
-    "🦷 Yangi buyurtma (Admin)",
+    "🦷 Yangi buyurtma",
     "",
     `Order ID: #${params.orderId}`,
     `Mijoz: ${params.fullName || "-"}`,
@@ -94,19 +118,6 @@ export async function sendTelegramAdminOrder(params: TelegramOrderPayload) {
   return telegramBot("sendMessage", {
     chat_id: chatId,
     text,
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "✅ Qabul qilish",
-            callback_data: `accept:${params.orderId}`,
-          },
-          {
-            text: "❌ Bekor qilish",
-            callback_data: `cancel:${params.orderId}`,
-          },
-        ],
-      ],
-    },
+    reply_markup: orderActionKeyboard(params.orderId),
   });
 }
