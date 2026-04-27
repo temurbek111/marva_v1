@@ -10,7 +10,10 @@ export default function AdminOrdersPage() {
 
         <p className="mt-4 text-sm text-[#5D7E78]">
           Telegramga buyurtma yuborish API kodi{" "}
-          <code>app/api/orders/route.ts</code> ichida ishlaydi.
+          <code className="rounded bg-[#F3F6F5] px-2 py-1">
+            app/api/orders/route.ts
+          </code>{" "}
+          ichida ishlaydi.
         </p>
       </div>
     </div>
