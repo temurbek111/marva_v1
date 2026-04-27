@@ -476,17 +476,28 @@ export default function CheckoutPage() {
         return;
       }
 
-const orderItems = items.map((item) => ({
-  order_id: order.id,
-  product_id: Number(item.product.id),
-  product_name: item.product.name,
-  quantity: item.quantity,
-  price: item.product.price,
-}));
+      const orderItems = items.map((item) => ({
+        order_id: order.id,
+        product_id: Number(item.product.id),
+        product_name: item.product.name,
+        quantity: item.quantity,
+        price: item.product.price,
+      }));
 
-const { error: itemsError } = await supabase
-  .from("order_items")
-  .insert(orderItems);
+      const telegramOrderItems = items.map((item) => ({
+        order_id: order.id,
+        product_id: Number(item.product.id),
+        product_number: item.product.id,
+        product_name: item.product.name,
+        product_description:
+          item.product.shortDescription || item.product.description || "",
+        quantity: item.quantity,
+        price: item.product.price,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .insert(orderItems);
 
       if (itemsError) {
         alert(itemsError.message);
@@ -507,7 +518,8 @@ const { error: itemsError } = await supabase
             address: finalAddress,
             note,
             totalAmount: formatPrice(total),
-items: orderItems,         }),
+            items: telegramOrderItems,
+          }),
         });
       } catch (error) {
         console.error("Admin telegramga yuborishda xato:", error);
@@ -615,7 +627,7 @@ items: orderItems,         }),
                 </label>
                 <select
                   value={viloyat}
-                  onChange={(e) => setViloyat(e.target.value)}
+                  onChange={(event) => setViloyat(event.target.value)}
                   className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
                 >
                   <option value="">Viloyatni tanlang</option>
@@ -633,7 +645,7 @@ items: orderItems,         }),
                 </label>
                 <select
                   value={tuman}
-                  onChange={(e) => setTuman(e.target.value)}
+                  onChange={(event) => setTuman(event.target.value)}
                   disabled={!viloyat}
                   className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none disabled:opacity-60"
                 >
@@ -655,7 +667,7 @@ items: orderItems,         }),
                 </label>
                 <input
                   value={street}
-                  onChange={(e) => setStreet(e.target.value)}
+                  onChange={(event) => setStreet(event.target.value)}
                   placeholder="Masalan: Amir Temur ko‘chasi"
                   className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
                 />
@@ -667,7 +679,7 @@ items: orderItems,         }),
                 </label>
                 <input
                   value={houseNumber}
-                  onChange={(e) => setHouseNumber(e.target.value)}
+                  onChange={(event) => setHouseNumber(event.target.value)}
                   placeholder="Masalan: 12"
                   className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
                 />
@@ -676,7 +688,7 @@ items: orderItems,         }),
 
             <textarea
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(event) => setNote(event.target.value)}
               placeholder="Izoh"
               rows={4}
               className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
