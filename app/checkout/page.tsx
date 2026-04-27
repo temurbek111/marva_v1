@@ -455,6 +455,22 @@ export default function CheckoutPage() {
       const userId = savedUser.id ?? null;
       const finalAddress = formattedAddress;
 
+      const productsText = items
+        .map((item, index) => {
+          return `${index + 1}. ${item.product.name} — ${
+            item.quantity
+          } dona x ${formatPrice(item.product.price)}`;
+        })
+        .join("\n");
+
+      const finalNote = [
+        note.trim() ? `Mijoz izohi: ${note.trim()}` : null,
+        "Mahsulotlar:",
+        productsText,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -465,7 +481,7 @@ export default function CheckoutPage() {
           total_amount: total,
           order_status: "Yangi",
           delivery_status: "Dastavka biriktirilmagan",
-          note,
+          note: finalNote,
         })
         .select()
         .single();
@@ -480,17 +496,6 @@ export default function CheckoutPage() {
         order_id: order.id,
         product_id: Number(item.product.id),
         product_name: item.product.name,
-        quantity: item.quantity,
-        price: item.product.price,
-      }));
-
-      const telegramOrderItems = items.map((item) => ({
-        order_id: order.id,
-        product_id: Number(item.product.id),
-        product_number: item.product.id,
-        product_name: item.product.name,
-        product_description:
-          item.product.shortDescription || item.product.description || "",
         quantity: item.quantity,
         price: item.product.price,
       }));
@@ -516,9 +521,9 @@ export default function CheckoutPage() {
             fullName: savedUser.fullName,
             phone: savedUser.phone,
             address: finalAddress,
-            note,
+            note: finalNote,
             totalAmount: formatPrice(total),
-            items: telegramOrderItems,
+            items: orderItems,
           }),
         });
       } catch (error) {
