@@ -8,12 +8,14 @@ type ReelsViewerModalProps = {
   isOpen: boolean;
   reels: Reel[];
   onClose: () => void;
+  onReelViewed?: (reelId: number) => void;
 };
 
 export default function ReelsViewerModal({
   isOpen,
   reels,
   onClose,
+  onReelViewed,
 }: ReelsViewerModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
@@ -37,7 +39,10 @@ export default function ReelsViewerModal({
       setIsPaused(false);
       setTranslateY(0);
       setIsDragging(false);
+      return;
     }
+
+    setIsMuted(false);
   }, [isOpen]);
 
   useEffect(() => {
@@ -46,18 +51,68 @@ export default function ReelsViewerModal({
     setIsVideoLoading(true);
     setProgress(0);
     setIsPaused(false);
-    setIsMuted(false);
-  }, [isOpen, currentReel]);
+
+    onReelViewed?.(currentReel.id);
+  }, [isOpen, currentReel, onReelViewed]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     video.muted = isMuted;
+
     if (!isMuted) {
       video.volume = 1;
     }
   }, [isMuted, currentIndex, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      if (event.key === "ArrowRight") {
+        goToNext();
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        goToPrevious();
+        return;
+      }
+
+      if (event.key === " ") {
+        event.preventDefault();
+
+        if (videoRef.current?.paused) {
+          resumeVideo();
+        } else {
+          pauseVideo();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, currentIndex, reels.length]);
 
   const goToNext = () => {
     if (currentIndex < reels.length - 1) {
@@ -86,7 +141,10 @@ export default function ReelsViewerModal({
     const video = videoRef.current;
     if (!video) return;
 
-    void video.play();
+    void video.play().catch((error) => {
+      console.error("Failed to resume reel video:", error);
+    });
+
     setIsPaused(false);
   };
 
@@ -99,56 +157,15 @@ export default function ReelsViewerModal({
     if (!video) return;
 
     video.muted = nextMuted;
+
     if (!nextMuted) {
       video.volume = 1;
-      void video.play();
+
+      void video.play().catch((error) => {
+        console.error("Failed to play reel video after unmute:", error);
+      });
     }
   };
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-
-      if (event.key === "ArrowRight") {
-        goToNext();
-      }
-
-      if (event.key === "ArrowLeft") {
-        goToPrevious();
-      }
-
-      if (event.key === " ") {
-        event.preventDefault();
-
-        if (videoRef.current?.paused) {
-          resumeVideo();
-        } else {
-          pauseVideo();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, currentIndex, reels.length]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [isOpen]);
 
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     const touchY = event.touches[0]?.clientY ?? 0;
@@ -251,11 +268,11 @@ export default function ReelsViewerModal({
               </button>
 
               <div className="min-w-0 flex-1 text-center">
-                {currentReel.title && (
+                {currentReel.title ? (
                   <p className="truncate text-sm font-medium text-white">
                     {currentReel.title}
                   </p>
-                )}
+                ) : null}
               </div>
 
               <button
@@ -307,16 +324,37 @@ export default function ReelsViewerModal({
               muted={isMuted}
               playsInline
               preload="auto"
+              controls={false}
+              onLoadedMetadata={() => {
+                setProgress(0);
+              }}
               onCanPlay={() => {
                 setIsVideoLoading(false);
+
                 const video = videoRef.current;
-                if (video && !isMuted) {
-                  video.muted = false;
+                if (!video) return;
+
+                video.muted = isMuted;
+                if (!isMuted) {
                   video.volume = 1;
                 }
+
+                void video.play().catch((error) => {
+                  console.error("Failed to autoplay reel video:", error);
+                });
+              }}
+              onTimeUpdate={(event) => {
+                const video = event.currentTarget;
+
+                if (!video.duration || Number.isNaN(video.duration)) {
+                  setProgress(0);
+                  return;
+                }
+
+                const nextProgress = (video.currentTime / video.duration) * 100;
+                setProgress(nextProgress);
               }}
               onEnded={goToNext}
-              controls={false}
             />
 
             {isPaused && !isVideoLoading && (
