@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import axios from "axios";
 
+export const runtime = "nodejs";
+
+const CRON_SECRET = process.env.CRON_SECRET;
+const MOYSKLAD_BASE_URL =
+  process.env.MOYSKLAD_BASE_URL || "https://api.moysklad.ru/api/remap/1.2";
+
 type MoyProduct = {
   id: string;
   name?: string;
@@ -21,7 +27,44 @@ type MoyStockRow = {
   stock?: number | string;
 };
 
-export async function GET() {
+type ProductPayload = {
+  external_id: string;
+  name: string;
+  slug: string;
+  description: string;
+  full_description: string;
+  article: string | null;
+  code: string | null;
+  price: number;
+  old_price: number | null;
+  image_url: string | null;
+  stock: number;
+  is_active: boolean;
+  images: string[];
+};
+
+function normalizeError(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data || error.message || "Axios xato";
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Noma'lum xato";
+}
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization");
+
+  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   try {
     const token = process.env.MOYSKLAD_TOKEN;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,11 +103,15 @@ export async function GET() {
 
       while (true) {
         const res = await axiosClient.get(
-          `https://api.moysklad.ru/api/remap/1.2/entity/product?limit=${limit}&offset=${offset}`
+          `${MOYSKLAD_BASE_URL}/entity/product?limit=${limit}&offset=${offset}`
         );
 
-        const rows: MoyProduct[] = res.data?.rows || [];
-        total = res.data?.meta?.size || total;
+        const rows: MoyProduct[] = Array.isArray(res.data?.rows)
+          ? res.data.rows
+          : [];
+
+        total =
+          typeof res.data?.meta?.size === "number" ? res.data.meta.size : total;
 
         allRows = allRows.concat(rows);
 
@@ -82,12 +129,16 @@ export async function GET() {
 
       while (true) {
         const res = await axiosClient.get(
-          `https://api.moysklad.ru/api/remap/1.2/report/stock/all/current?limit=${limit}&offset=${offset}`
+          `${MOYSKLAD_BASE_URL}/report/stock/all/current?limit=${limit}&offset=${offset}`
         );
 
         const rows: MoyStockRow[] = Array.isArray(res.data)
           ? res.data
-          : res.data?.rows || res.data?.data || [];
+          : Array.isArray(res.data?.rows)
+            ? res.data.rows
+            : Array.isArray(res.data?.data)
+              ? res.data.data
+              : [];
 
         allRows = allRows.concat(rows);
 
@@ -102,7 +153,7 @@ export async function GET() {
       imageMetaHref: string | null,
       externalId: string,
       versionSeed: string
-    ) {
+    ): Promise<string | null> {
       if (!imageMetaHref) return null;
 
       try {
@@ -118,12 +169,12 @@ export async function GET() {
 
         if (!sourceUrl) return null;
 
-        const imageRes = await axiosClient.get(sourceUrl, {
+        const imageRes = await axiosClient.get<ArrayBuffer>(sourceUrl, {
           responseType: "arraybuffer",
         });
 
         const contentType =
-          imageRes.headers["content-type"] || "image/png";
+          String(imageRes.headers["content-type"] || "image/png").toLowerCase();
 
         const ext =
           contentType.includes("jpeg") || contentType.includes("jpg")
@@ -141,7 +192,10 @@ export async function GET() {
             upsert: true,
           });
 
-        if (uploadError) return null;
+        if (uploadError) {
+          console.error("Image upload error:", uploadError.message);
+          return null;
+        }
 
         const { data: publicUrlData } = supabase.storage
           .from("products")
@@ -149,7 +203,8 @@ export async function GET() {
 
         const version = encodeURIComponent(versionSeed || "1");
         return `${publicUrlData.publicUrl}?v=${version}`;
-      } catch {
+      } catch (error) {
+        console.error(`Image fetch error for product ${externalId}:`, error);
         return null;
       }
     }
@@ -164,7 +219,7 @@ export async function GET() {
       stockMap.set(item.assortmentId, Number(item.stock || 0));
     }
 
-    const payload: any[] = [];
+    const payload: ProductPayload[] = [];
 
     for (const item of moyProducts) {
       const imageUrl = await getProductImageUrl(
@@ -191,7 +246,7 @@ export async function GET() {
     }
 
     const totalProducts = payload.length;
-    const withImage = payload.filter((item) => item.image_url).length;
+    const withImage = payload.filter((item) => Boolean(item.image_url)).length;
     const withoutImage = totalProducts - withImage;
 
     const { data, error } = await supabase
@@ -219,13 +274,20 @@ export async function GET() {
       if (!dbReadError && allDbRows) {
         const idsToDeactivate = allDbRows
           .map((row) => row.external_id)
-          .filter((id) => id && !currentExternalIds.includes(id));
+          .filter(
+            (id): id is string =>
+              typeof id === "string" && !currentExternalIds.includes(id)
+          );
 
         if (idsToDeactivate.length > 0) {
-          await supabase
+          const { error: deactivateError } = await supabase
             .from("products")
             .update({ is_active: false })
             .in("external_id", idsToDeactivate);
+
+          if (deactivateError) {
+            console.error("Deactivate old products error:", deactivateError);
+          }
         }
       }
     }
@@ -239,11 +301,11 @@ export async function GET() {
       count: data?.length || 0,
       sample: data?.slice(0, 10) || [],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       {
         ok: false,
-        error: error?.response?.data || error?.message || "Noma'lum xato",
+        error: normalizeError(error),
       },
       { status: 500 }
     );
