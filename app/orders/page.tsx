@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
 import { Package, ShoppingBag, Clock3, ChevronRight } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 type SavedUser = {
   id?: number | string;
@@ -21,68 +22,81 @@ type OrderItem = {
   image?: string;
 };
 
-type SavedOrder = {
+type UiOrder = {
   id: string;
   createdAt: string;
-  status?: "new" | "processing" | "delivered" | "cancelled";
+  status?: string | null;
   total: number;
   items: OrderItem[];
   address?: string;
   paymentMethod?: string;
-  userKey?: string;
-  telegramId?: string | number | null;
-  phone?: string;
+  phone?: string | null;
 };
 
-function getCurrentUserKey(user: SavedUser | null) {
-  if (!user) return "guest";
+type DbOrderRow = {
+  id: number;
+  created_at: string;
+  total_amount: number | null;
+  address: string | null;
+  order_status: string | null;
+  delivery_status: string | null;
+  phone: string | null;
+};
 
-  if (user.telegramId) return `tg:${user.telegramId}`;
-  if (user.phone) return `phone:${user.phone}`;
-  if (user.id) return `id:${user.id}`;
+type DbOrderItemRow = {
+  order_id: number;
+  product_id: number | null;
+  product_name: string | null;
+  quantity: number | null;
+  price: number | null;
+};
 
-  return "guest";
-}
+type DbProductRow = {
+  id: number;
+  image_url: string | null;
+  images: unknown;
+};
 
-function orderBelongsToUser(order: SavedOrder, user: SavedUser | null) {
-  if (!user) return false;
+function getStatusLabel(status?: string | null) {
+  const normalized = String(status || "").toLowerCase();
 
-  const currentUserKey = getCurrentUserKey(user);
-
-  if (order.userKey) {
-    return order.userKey === currentUserKey;
-  }
-
-  if (user.telegramId && order.telegramId) {
-    return String(order.telegramId) === String(user.telegramId);
-  }
-
-  if (user.phone && order.phone) {
-    return String(order.phone) === String(user.phone);
-  }
-
-  return false;
-}
-
-function getStatusLabel(status?: SavedOrder["status"]) {
-  if (status === "processing") {
+  if (
+    normalized.includes("processing") ||
+    normalized.includes("jarayon")
+  ) {
     return {
       text: "Jarayonda",
       className: "bg-[#FFF4E5] text-[#D9822B]",
     };
   }
 
-  if (status === "delivered") {
+  if (
+    normalized.includes("delivered") ||
+    normalized.includes("yetkaz")
+  ) {
     return {
       text: "Yetkazilgan",
       className: "bg-[#ECF8F3] text-[#0A7A5A]",
     };
   }
 
-  if (status === "cancelled") {
+  if (
+    normalized.includes("cancel") ||
+    normalized.includes("bekor")
+  ) {
     return {
       text: "Bekor qilingan",
       className: "bg-[#FDECEC] text-[#D94B4B]",
+    };
+  }
+
+  if (
+    normalized.includes("accept") ||
+    normalized.includes("qabul")
+  ) {
+    return {
+      text: "Qabul qilindi",
+      className: "bg-[#EEF4FF] text-[#2563EB]",
     };
   }
 
@@ -116,54 +130,192 @@ function getShortAddress(value?: string | null) {
   return value;
 }
 
+function getProductImage(product?: DbProductRow) {
+  if (!product) return "";
+
+  if (product.image_url && product.image_url.trim()) {
+    return product.image_url;
+  }
+
+  if (Array.isArray(product.images)) {
+    const firstImage = product.images.find(
+      (value): value is string =>
+        typeof value === "string" && value.trim().length > 0
+    );
+
+    if (firstImage) {
+      return firstImage;
+    }
+  }
+
+  return "";
+}
+
 export default function OrdersPage() {
   const router = useRouter();
-  const [orders, setOrders] = useState<SavedOrder[]>([]);
-  const [currentUser, setCurrentUser] = useState<SavedUser | null>(null);
+
+  const [orders, setOrders] = useState<UiOrder[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setMounted(true);
+    let cancelled = false;
 
-    try {
-      const savedUser = localStorage.getItem("marva-user");
-      const savedOrders = localStorage.getItem("marva-orders");
+    async function loadOrders() {
+      setMounted(true);
 
-      if (savedUser) {
-        setCurrentUser(JSON.parse(savedUser));
-      }
+      try {
+        const savedUser = localStorage.getItem("marva-user");
 
-      if (savedOrders) {
-        const parsedOrders = JSON.parse(savedOrders);
-        if (Array.isArray(parsedOrders)) {
-          setOrders(parsedOrders);
+        if (!savedUser) {
+          if (!cancelled) {
+            setOrders([]);
+          }
+          return;
+        }
+
+        const parsedUser = JSON.parse(savedUser) as SavedUser;
+
+        if (!parsedUser?.id) {
+          if (!cancelled) {
+            setOrders([]);
+          }
+          return;
+        }
+
+        const userId = Number(parsedUser.id);
+
+        if (!Number.isFinite(userId)) {
+          if (!cancelled) {
+            setOrders([]);
+          }
+          return;
+        }
+
+        const { data: orderRows, error: ordersError } = await supabase
+          .from("orders")
+          .select(
+            "id, created_at, total_amount, address, order_status, delivery_status, phone"
+          )
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
+
+        if (ordersError) {
+          throw ordersError;
+        }
+
+        const safeOrders = (orderRows ?? []) as DbOrderRow[];
+
+        if (!safeOrders.length) {
+          if (!cancelled) {
+            setOrders([]);
+          }
+          return;
+        }
+
+        const orderIds = safeOrders.map((order) => order.id);
+
+        const { data: orderItemRows, error: itemsError } = await supabase
+          .from("order_items")
+          .select("order_id, product_id, product_name, quantity, price")
+          .in("order_id", orderIds);
+
+        if (itemsError) {
+          throw itemsError;
+        }
+
+        const safeItems = (orderItemRows ?? []) as DbOrderItemRow[];
+
+        const productIds = Array.from(
+          new Set(
+            safeItems
+              .map((item) => item.product_id)
+              .filter((id): id is number => typeof id === "number")
+          )
+        );
+
+        let productsById = new Map<number, DbProductRow>();
+
+        if (productIds.length > 0) {
+          const { data: productRows, error: productsError } = await supabase
+            .from("products")
+            .select("id, image_url, images")
+            .in("id", productIds);
+
+          if (productsError) {
+            throw productsError;
+          }
+
+          const safeProducts = (productRows ?? []) as DbProductRow[];
+
+          productsById = new Map(
+            safeProducts.map((product) => [product.id, product])
+          );
+        }
+
+        const itemsByOrderId = new Map<number, OrderItem[]>();
+
+        for (const item of safeItems) {
+          const linkedProduct =
+            item.product_id != null ? productsById.get(item.product_id) : undefined;
+
+          const mappedItem: OrderItem = {
+            id: item.product_id ?? `${item.order_id}-${item.product_name ?? "item"}`,
+            name: item.product_name || "Nomsiz mahsulot",
+            price: Number(item.price || 0),
+            quantity: Number(item.quantity || 0),
+            image: getProductImage(linkedProduct),
+          };
+
+          const currentItems = itemsByOrderId.get(item.order_id) ?? [];
+          currentItems.push(mappedItem);
+          itemsByOrderId.set(item.order_id, currentItems);
+        }
+
+        const mappedOrders: UiOrder[] = safeOrders.map((order) => ({
+          id: String(order.id),
+          createdAt: order.created_at,
+          status: order.order_status,
+          total: Number(order.total_amount || 0),
+          items: itemsByOrderId.get(order.id) ?? [],
+          address: order.address || undefined,
+          paymentMethod: undefined,
+          phone: order.phone,
+        }));
+
+        if (!cancelled) {
+          setOrders(mappedOrders);
+        }
+      } catch (error) {
+        console.error("Orders fetch error:", error);
+
+        if (!cancelled) {
+          setOrders([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
-    } catch (error) {
-      console.error("Orders parse error:", error);
     }
-  }, []);
 
-  const filteredOrders = useMemo(() => {
-    return orders
-      .filter((order) => orderBelongsToUser(order, currentUser))
-      .sort((a, b) => {
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      });
-  }, [orders, currentUser]);
+    loadOrders();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F3F6F5] pb-28">
       <Header />
 
       <Container className="py-4">
-        {!mounted ? (
+        {!mounted || loading ? (
           <div className="rounded-[28px] bg-white p-5 text-center text-sm text-[#6B7280] shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
             Yuklanmoqda...
           </div>
-        ) : filteredOrders.length === 0 ? (
+        ) : orders.length === 0 ? (
           <div className="rounded-[32px] bg-white px-5 py-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]">
               <ShoppingBag size={34} />
@@ -192,14 +344,14 @@ export default function OrdersPage() {
                 Buyurtmalarim
               </div>
               <div className="mt-2 text-[28px] font-bold leading-none text-[#12332D]">
-                {filteredOrders.length} ta
+                {orders.length} ta
               </div>
               <div className="mt-2 text-sm text-[#6B8A84]">
                 Faqat sizga tegishli buyurtmalar ko‘rinadi
               </div>
             </div>
 
-            {filteredOrders.map((order) => {
+            {orders.map((order) => {
               const status = getStatusLabel(order.status);
 
               return (
@@ -284,43 +436,30 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
-                  {(order.address || order.paymentMethod) && (
+                  {order.address ? (
                     <div className="mt-4 space-y-3 text-sm text-[#5D7E78]">
-                      {order.address ? (
-                        <div className="rounded-[20px] bg-[#F7FAF9] p-3">
-                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6B8A84]">
-                            Manzil
-                          </div>
-
-                          {isMapLink(order.address) ? (
-                            <a
-                              href={order.address}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-2 inline-flex rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#004F45] ring-1 ring-black/5"
-                            >
-                              {getShortAddress(order.address)}
-                            </a>
-                          ) : (
-                            <p className="mt-2 line-clamp-2 text-sm font-medium text-[#12332D]">
-                              {getShortAddress(order.address)}
-                            </p>
-                          )}
+                      <div className="rounded-[20px] bg-[#F7FAF9] p-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6B8A84]">
+                          Manzil
                         </div>
-                      ) : null}
 
-                      {order.paymentMethod ? (
-                        <div className="rounded-[20px] bg-[#F7FAF9] p-3">
-                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6B8A84]">
-                            To‘lov
-                          </div>
-                          <p className="mt-2 text-sm font-medium text-[#12332D]">
-                            {order.paymentMethod}
+                        {isMapLink(order.address) ? (
+                          <a
+                            href={order.address}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#004F45] ring-1 ring-black/5"
+                          >
+                            {getShortAddress(order.address)}
+                          </a>
+                        ) : (
+                          <p className="mt-2 line-clamp-2 text-sm font-medium text-[#12332D]">
+                            {getShortAddress(order.address)}
                           </p>
-                        </div>
-                      ) : null}
+                        )}
+                      </div>
                     </div>
-                  )}
+                  ) : null}
 
                   <button
                     onClick={() => router.push("/catalog")}
