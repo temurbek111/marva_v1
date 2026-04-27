@@ -70,6 +70,7 @@ export default async function ProductDetailPage({
     id: String(product.id),
     slug: `product-${product.id}`,
     categoryId: product.category_id ? String(product.category_id) : "",
+    moyskladProductId: product.external_id || "",
     name: product.name,
     price: Number(product.price || 0),
     oldPrice: product.old_price ? Number(product.old_price) : undefined,

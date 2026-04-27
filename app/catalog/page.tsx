@@ -39,7 +39,7 @@ async function getProducts(
   let query = supabase
     .from("products")
     .select(
-      "id, name, price, old_price, images, image_url, use_category, stock, is_featured, category_id, description",
+      "id, external_id, name, price, old_price, images, image_url, use_category, stock, is_featured, category_id, description",
       { count: "exact" }
     )
     .eq("is_active", true)
@@ -191,6 +191,7 @@ export default async function CatalogPage({ searchParams }: PageProps) {
                   product={{
                     id: String(product.id),
                     slug: `product-${product.id}`,
+                    moyskladProductId: product.external_id || "",
                     categoryId: product.category_id
                       ? String(product.category_id)
                       : "",

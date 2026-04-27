@@ -7,8 +7,8 @@ type OrderItem = {
   product_name?: string;
   quantity?: number;
   price?: number | string;
-  product_id?: string;
-  moysklad_product_id?: string;
+  product_id?: string | number;
+  moysklad_product_id?: string | null;
 };
 
 type OrderRequestBody = {
@@ -68,13 +68,16 @@ function attachMoyskladIds(items: OrderItem[]): OrderItem[] {
   return items.map((item) => ({
     ...item,
     moysklad_product_id:
-      item.moysklad_product_id || map[item.product_name || ""],
+      item.moysklad_product_id || map[item.product_name || ""] || null,
   }));
 }
 
 function buildMoyskladPositions(items: OrderItem[]) {
   return items
-    .filter((item) => item.moysklad_product_id && Number(item.quantity || 0) > 0)
+    .filter(
+      (item) =>
+        item.moysklad_product_id && Number(item.quantity || 0) > 0
+    )
     .map((item) => ({
       quantity: Number(item.quantity || 0),
       price: Math.round(Number(item.price || 0) * 100),
@@ -118,7 +121,7 @@ async function createMoyskladOrder(params: {
 
   if (!positions.length) {
     throw new Error(
-      "MoySklad uchun positions topilmadi. product_name map bilan mos kelmayapti yoki moysklad_product_id yo‘q."
+      "MoySklad uchun positions topilmadi. moysklad_product_id yuborilmadi yoki mapping topilmadi."
     );
   }
 
@@ -129,7 +132,7 @@ async function createMoyskladOrder(params: {
       `Mijoz: ${params.fullName || "-"}`,
       `Telefon: ${params.phone || "-"}`,
       `Manzil: ${params.address || "-"}`,
-      params.latitude && params.longitude
+      params.latitude != null && params.longitude != null
         ? `Koordinata: ${params.latitude}, ${params.longitude}`
         : null,
       `Izoh: ${params.note || "-"}`,

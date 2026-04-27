@@ -13,6 +13,7 @@ type Product = {
   image?: string;
   slug?: string;
   categoryId?: string;
+  moyskladProductId?: string;
   currency?: string;
   shortDescription?: string;
   description?: string;
@@ -43,6 +44,7 @@ export function ProductCard({ product }: { product: Product }) {
     id: String(product.id),
     slug: product.slug || `product-${product.id}`,
     categoryId: product.categoryId || "",
+    moyskladProductId: product.moyskladProductId || "",
     name: product.name,
     price: Number(product.price || 0),
     oldPrice: product.oldPrice ? Number(product.oldPrice) : undefined,
@@ -67,27 +69,28 @@ export function ProductCard({ product }: { product: Product }) {
           className: "bg-[#FDECEC] text-[#D94B4B]",
         }
       : stock < 3
-      ? {
-          label: "Sanoqli qolgan",
-          className: "bg-[#FFF4E5] text-[#D9822B]",
-        }
-      : {
-          label: "Sotuvda mavjud",
-          className: "bg-[#ECF8F3] text-[#0A7A5A]",
-        };
+        ? {
+            label: "Sanoqli qolgan",
+            className: "bg-[#FFF4E5] text-[#D9822B]",
+          }
+        : {
+            label: "Sotuvda mavjud",
+            className: "bg-[#ECF8F3] text-[#0A7A5A]",
+          };
 
   const openProduct = () => {
-  if (typeof window !== "undefined") {
-    const currentUrl = window.location.pathname + window.location.search;
+    if (typeof window !== "undefined") {
+      const currentUrl = window.location.pathname + window.location.search;
 
-    if (currentUrl.startsWith("/catalog")) {
-      sessionStorage.setItem("catalog-scroll-y", String(window.scrollY));
-      sessionStorage.setItem("catalog-return-url", currentUrl);
+      if (currentUrl.startsWith("/catalog")) {
+        sessionStorage.setItem("catalog-scroll-y", String(window.scrollY));
+        sessionStorage.setItem("catalog-return-url", currentUrl);
+      }
     }
-  }
 
-  router.push(`/product/${product.id}`);
-};
+    router.push(`/product/${product.id}`);
+  };
+
   const handleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
     toggleFavorite(mappedProduct);

@@ -7,6 +7,7 @@ type ProductItem = {
   id: string;
   slug: string;
   categoryId: string;
+  moyskladProductId?: string;
   name: string;
   price: number;
   oldPrice?: number;

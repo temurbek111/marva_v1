@@ -6,7 +6,6 @@ import { useAppLang } from "@/components/common/LangProvider";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
-import DeliveryLocationField from "@/components/DeliveryLocationField";
 import { getTelegramUser } from "@/lib/web-telegram";
 import { supabase } from "@/lib/supabase";
 import {
@@ -58,6 +57,273 @@ type TelegramWebApp = {
     ) => void;
   };
 };
+
+type AddressParts = {
+  viloyat: string;
+  tuman: string;
+  street: string;
+  houseNumber: string;
+};
+
+const VILOYATLAR = [
+  "Toshkent shahri",
+  "Toshkent viloyati",
+  "Andijon viloyati",
+  "Buxoro viloyati",
+  "Farg‘ona viloyati",
+  "Jizzax viloyati",
+  "Xorazm viloyati",
+  "Namangan viloyati",
+  "Navoiy viloyati",
+  "Qashqadaryo viloyati",
+  "Qoraqalpog‘iston Respublikasi",
+  "Samarqand viloyati",
+  "Sirdaryo viloyati",
+  "Surxondaryo viloyati",
+] as const;
+
+const TUMANLAR_BY_VILOYAT: Record<string, string[]> = {
+  "Toshkent shahri": [
+    "Bektemir",
+    "Chilonzor",
+    "Mirobod",
+    "Mirzo Ulug‘bek",
+    "Olmazor",
+    "Sergeli",
+    "Shayxontohur",
+    "Uchtepa",
+    "Yakkasaroy",
+    "Yashnobod",
+    "Yunusobod",
+    "Yangi Hayot",
+  ],
+  "Toshkent viloyati": [
+    "Angren shahri",
+    "Bekobod",
+    "Bekobod shahri",
+    "Bo‘ka",
+    "Bo‘stonliq",
+    "Chinoz",
+    "Chirchiq shahri",
+    "Ohangaron",
+    "Ohangaron shahri",
+    "Oqqo‘rg‘on",
+    "Olmaliq shahri",
+    "Parkent",
+    "Piskent",
+    "Qibray",
+    "Quyi Chirchiq",
+    "Toshkent",
+    "Yangiyo‘l",
+    "Yangiyo‘l shahri",
+    "Yuqori Chirchiq",
+    "Zangiota",
+    "O‘rta Chirchiq",
+  ],
+  "Andijon viloyati": [
+    "Andijon shahri",
+    "Andijon",
+    "Asaka",
+    "Baliqchi",
+    "Bo‘ston",
+    "Buloqboshi",
+    "Izboskan",
+    "Jalolquduq",
+    "Xo‘jaobod",
+    "Qo‘rg‘ontepa",
+    "Marhamat",
+    "Oltinko‘l",
+    "Paxtaobod",
+    "Shahrixon",
+    "Ulug‘nor",
+  ],
+  "Buxoro viloyati": [
+    "Buxoro shahri",
+    "Buxoro",
+    "G‘ijduvon",
+    "Jondor",
+    "Kogon",
+    "Kogon shahri",
+    "Olot",
+    "Peshku",
+    "Qorako‘l",
+    "Qorovulbozor",
+    "Romitan",
+    "Shofirkon",
+    "Vobkent",
+  ],
+  "Farg‘ona viloyati": [
+    "Farg‘ona shahri",
+    "Farg‘ona",
+    "Beshariq",
+    "Bog‘dod",
+    "Buvayda",
+    "Dang‘ara",
+    "Furqat",
+    "Marg‘ilon shahri",
+    "Oltiariq",
+    "Qo‘qon shahri",
+    "Quva",
+    "Quvasoy shahri",
+    "Rishton",
+    "So‘x",
+    "Toshloq",
+    "Uchko‘prik",
+    "Yozyovon",
+  ],
+  "Jizzax viloyati": [
+    "Jizzax shahri",
+    "Arnasoy",
+    "Baxmal",
+    "Do‘stlik",
+    "Forish",
+    "G‘allaorol",
+    "Mirzacho‘l",
+    "Paxtakor",
+    "Yangiobod",
+    "Zafarobod",
+    "Zarbdor",
+    "Zomin",
+    "Sharof Rashidov",
+  ],
+  "Xorazm viloyati": [
+    "Urganch shahri",
+    "Bog‘ot",
+    "Gurlan",
+    "Hazorasp",
+    "Xiva",
+    "Xiva shahri",
+    "Qo‘shko‘pir",
+    "Shovot",
+    "Tuproqqal’a",
+    "Urganch",
+    "Xonqa",
+    "Yangiariq",
+    "Yangibozor",
+  ],
+  "Namangan viloyati": [
+    "Namangan shahri",
+    "Chortoq",
+    "Chust",
+    "Kosonsoy",
+    "Mingbuloq",
+    "Namangan",
+    "Norin",
+    "Pop",
+    "To‘raqo‘rg‘on",
+    "Uchqo‘rg‘on",
+    "Uychi",
+    "Yangiqo‘rg‘on",
+  ],
+  "Navoiy viloyati": [
+    "Navoiy shahri",
+    "Zarafshon shahri",
+    "Karmana",
+    "Konimex",
+    "Navbahor",
+    "Nurota",
+    "Qiziltepa",
+    "Tomdi",
+    "Uchquduq",
+    "Xatirchi",
+  ],
+  "Qashqadaryo viloyati": [
+    "Qarshi shahri",
+    "Shahrisabz shahri",
+    "Chiroqchi",
+    "Dehqonobod",
+    "G‘uzor",
+    "Kasbi",
+    "Kitob",
+    "Koson",
+    "Ko‘kdala",
+    "Mirishkor",
+    "Muborak",
+    "Nishon",
+    "Qamashi",
+    "Qarshi",
+    "Shahrisabz",
+    "Yakkabog‘",
+  ],
+  "Qoraqalpog‘iston Respublikasi": [
+    "Nukus shahri",
+    "Amudaryo",
+    "Beruniy",
+    "Bo‘zatov",
+    "Chimboy",
+    "Ellikqal’a",
+    "Kegeyli",
+    "Mo‘ynoq",
+    "Nukus",
+    "Qanliko‘l",
+    "Qo‘ng‘irot",
+    "Qorao‘zak",
+    "Shumanay",
+    "Taxtako‘pir",
+    "Taxiatosh",
+    "To‘rtko‘l",
+    "Xo‘jayli",
+  ],
+  "Samarqand viloyati": [
+    "Samarqand shahri",
+    "Bulung‘ur",
+    "Ishtixon",
+    "Jomboy",
+    "Kattaqo‘rg‘on",
+    "Kattaqo‘rg‘on shahri",
+    "Narpay",
+    "Nurobod",
+    "Oqdaryo",
+    "Paxtachi",
+    "Payariq",
+    "Pastdarg‘om",
+    "Qo‘shrabot",
+    "Samarqand",
+    "Toyloq",
+    "Urgut",
+  ],
+  "Sirdaryo viloyati": [
+    "Guliston shahri",
+    "Yangiyer shahri",
+    "Shirin shahri",
+    "Boyovut",
+    "Guliston",
+    "Mirzaobod",
+    "Oqoltin",
+    "Sayxunobod",
+    "Sardoba",
+    "Sirdaryo",
+    "Xovos",
+  ],
+  "Surxondaryo viloyati": [
+    "Termiz shahri",
+    "Angor",
+    "Bandixon",
+    "Boysun",
+    "Denov",
+    "Jarqo‘rg‘on",
+    "Muzrabot",
+    "Oltinsoy",
+    "Qiziriq",
+    "Qumqo‘rg‘on",
+    "Sariosiyo",
+    "Sherobod",
+    "Sho‘rchi",
+    "Termiz",
+    "Uzun",
+  ],
+};
+
+function buildAddress(parts: AddressParts) {
+  return [
+    parts.viloyat.trim(),
+    parts.tuman.trim(),
+    parts.street.trim(),
+    parts.houseNumber.trim(),
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
 
 function normalizePhone(value: string) {
   return String(value || "").replace(/[^\d+]/g, "").trim();
@@ -124,9 +390,12 @@ export default function AuthPage() {
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
+
+  const [viloyat, setViloyat] = useState("");
+  const [tuman, setTuman] = useState("");
+  const [street, setStreet] = useState("");
+  const [houseNumber, setHouseNumber] = useState("");
+
   const [telegramUsername, setTelegramUsername] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -137,6 +406,15 @@ export default function AuthPage() {
   const [telegramContactRequested, setTelegramContactRequested] =
     useState(false);
   const [telegramStatus, setTelegramStatus] = useState("");
+
+  const currentTumans = viloyat ? TUMANLAR_BY_VILOYAT[viloyat] ?? [] : [];
+
+  const formattedAddress = buildAddress({
+    viloyat,
+    tuman,
+    street,
+    houseNumber,
+  });
 
   const applyTelegramUser = (user: TelegramUser | null, overwrite = false) => {
     if (!user) return;
@@ -237,7 +515,7 @@ export default function AuthPage() {
       askContact();
     }
 
-    if (currentTgUser.username) {
+    if (currentTgUser?.username) {
       setTelegramStatus(
         lang === "uz"
           ? `Telegram username olindi: @${currentTgUser.username}`
@@ -326,6 +604,19 @@ export default function AuthPage() {
     hydrate();
   }, [router, tgUser, lang]);
 
+  useEffect(() => {
+    if (!viloyat) {
+      setTuman("");
+      return;
+    }
+
+    const availableTumans = TUMANLAR_BY_VILOYAT[viloyat] ?? [];
+
+    if (tuman && !availableTumans.includes(tuman)) {
+      setTuman("");
+    }
+  }, [viloyat, tuman]);
+
   const saveUser = async () => {
     if (!fullName.trim()) {
       alert(lang === "uz" ? "Ismni kiriting" : "Введите имя");
@@ -339,8 +630,12 @@ export default function AuthPage() {
       return;
     }
 
-    if (!address.trim()) {
-      alert(lang === "uz" ? "Manzilni kiriting" : "Введите адрес");
+    if (!viloyat || !tuman || !street.trim() || !houseNumber.trim()) {
+      alert(
+        lang === "uz"
+          ? "Viloyat, tuman, ko‘cha va uy raqamini kiriting"
+          : "Выберите область, район, улицу и номер дома"
+      );
       return;
     }
 
@@ -365,7 +660,7 @@ export default function AuthPage() {
       const payload = {
         full_name: fullName.trim(),
         phone: normalizedPhone,
-        address: address.trim(),
+        address: formattedAddress,
         age: age.trim() || null,
         gender: gender || null,
         customer_type: customerType || null,
@@ -562,19 +857,95 @@ export default function AuthPage() {
             </div>
 
             <div className="rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
-              <label className="mb-2 flex items-center gap-2 text-xs text-[#5D7E78]">
+              <label className="mb-3 flex items-center gap-2 text-xs text-[#5D7E78]">
                 <MapPin size={14} />
                 {lang === "uz" ? "Manzil" : "Адрес"}
               </label>
 
-              <DeliveryLocationField
-  address={address}
-  setAddressAction={setAddress}
-  latitude={latitude}
-  setLatitudeAction={setLatitude}
-  longitude={longitude}
-  setLongitudeAction={setLongitude}
-/>
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+                    {lang === "uz" ? "Viloyat" : "Область"}
+                  </label>
+
+                  <select
+                    value={viloyat}
+                    onChange={(e) => setViloyat(e.target.value)}
+                    className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
+                  >
+                    <option value="">
+                      {lang === "uz"
+                        ? "Viloyatni tanlang"
+                        : "Выберите область"}
+                    </option>
+
+                    {VILOYATLAR.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+                    {lang === "uz" ? "Tuman" : "Район"}
+                  </label>
+
+                  <select
+                    value={tuman}
+                    onChange={(e) => setTuman(e.target.value)}
+                    disabled={!viloyat}
+                    className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none disabled:opacity-60"
+                  >
+                    <option value="">
+                      {viloyat
+                        ? lang === "uz"
+                          ? "Tumanni tanlang"
+                          : "Выберите район"
+                        : lang === "uz"
+                        ? "Avval viloyatni tanlang"
+                        : "Сначала выберите область"}
+                    </option>
+
+                    {currentTumans.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+                    {lang === "uz" ? "Ko‘cha nomi" : "Улица"}
+                  </label>
+
+                  <input
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    placeholder={
+                      lang === "uz"
+                        ? "Masalan: Amir Temur ko‘chasi"
+                        : "Например: улица Амира Темура"
+                    }
+                    className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+                    {lang === "uz" ? "Uy raqami" : "Номер дома"}
+                  </label>
+
+                  <input
+                    value={houseNumber}
+                    onChange={(e) => setHouseNumber(e.target.value)}
+                    placeholder={lang === "uz" ? "Masalan: 12" : "Например: 12"}
+                    className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -719,3 +1090,4 @@ export default function AuthPage() {
     </div>
   );
 }
+

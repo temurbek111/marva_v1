@@ -177,7 +177,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      const orderItems = items.map((item) => ({
+      const dbOrderItems = items.map((item) => ({
         order_id: order.id,
         product_id: Number(item.product.id),
         product_name: item.product.name,
@@ -185,9 +185,18 @@ export default function CheckoutPage() {
         price: item.product.price,
       }));
 
+      const apiOrderItems = items.map((item) => ({
+        order_id: order.id,
+        product_id: Number(item.product.id),
+        product_name: item.product.name,
+        quantity: item.quantity,
+        price: item.product.price,
+        moysklad_product_id: item.product.moyskladProductId || null,
+      }));
+
       const { error: itemsError } = await supabase
         .from("order_items")
-        .insert(orderItems);
+        .insert(dbOrderItems);
 
       if (itemsError) {
         alert(itemsError.message);
@@ -206,9 +215,11 @@ export default function CheckoutPage() {
             fullName: savedUser.fullName,
             phone: savedUser.phone,
             address: finalAddress,
+            latitude,
+            longitude,
             note,
             totalAmount: formatPrice(total),
-            items: orderItems,
+            items: apiOrderItems,
           }),
         });
       } catch (error) {
@@ -311,14 +322,14 @@ export default function CheckoutPage() {
                 Yetkazib berish manzili
               </label>
 
-          <DeliveryLocationField
-  address={address}
-  setAddressAction={setAddress}
-  latitude={latitude}
-  setLatitudeAction={setLatitude}
-  longitude={longitude}
-  setLongitudeAction={setLongitude}
-/>
+              <DeliveryLocationField
+                address={address}
+                setAddressAction={setAddress}
+                latitude={latitude}
+                setLatitudeAction={setLatitude}
+                longitude={longitude}
+                setLongitudeAction={setLongitude}
+              />
             </div>
 
             <textarea
