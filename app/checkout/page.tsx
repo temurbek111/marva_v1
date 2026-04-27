@@ -7,7 +7,6 @@ import { useCartStore } from "@/lib/store";
 import { formatPrice } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { BottomNav } from "@/components/layout/BottomNav";
-import DeliveryLocationField from "@/components/DeliveryLocationField";
 
 type SavedUser = {
   id?: number;
@@ -39,6 +38,298 @@ type LocalSavedOrder = {
   phone?: string;
 };
 
+type AddressParts = {
+  viloyat: string;
+  tuman: string;
+  street: string;
+  houseNumber: string;
+};
+
+const VILOYATLAR = [
+  "Toshkent shahri",
+  "Toshkent viloyati",
+  "Andijon viloyati",
+  "Buxoro viloyati",
+  "Farg‘ona viloyati",
+  "Jizzax viloyati",
+  "Xorazm viloyati",
+  "Namangan viloyati",
+  "Navoiy viloyati",
+  "Qashqadaryo viloyati",
+  "Qoraqalpog‘iston Respublikasi",
+  "Samarqand viloyati",
+  "Sirdaryo viloyati",
+  "Surxondaryo viloyati",
+] as const;
+
+const TUMANLAR_BY_VILOYAT: Record<string, string[]> = {
+  "Toshkent shahri": [
+    "Bektemir",
+    "Chilonzor",
+    "Mirobod",
+    "Mirzo Ulug‘bek",
+    "Olmazor",
+    "Sergeli",
+    "Shayxontohur",
+    "Uchtepa",
+    "Yakkasaroy",
+    "Yashnobod",
+    "Yunusobod",
+    "Yangi Hayot",
+  ],
+  "Toshkent viloyati": [
+    "Angren shahri",
+    "Bekobod",
+    "Bekobod shahri",
+    "Bo‘ka",
+    "Bo‘stonliq",
+    "Chinoz",
+    "Chirchiq shahri",
+    "Ohangaron",
+    "Ohangaron shahri",
+    "Oqqo‘rg‘on",
+    "Olmaliq shahri",
+    "Parkent",
+    "Piskent",
+    "Qibray",
+    "Quyi Chirchiq",
+    "Toshkent",
+    "Yangiyo‘l",
+    "Yangiyo‘l shahri",
+    "Yuqori Chirchiq",
+    "Zangiota",
+    "O‘rta Chirchiq",
+  ],
+  "Andijon viloyati": [
+    "Andijon shahri",
+    "Andijon",
+    "Asaka",
+    "Baliqchi",
+    "Bo‘ston",
+    "Buloqboshi",
+    "Izboskan",
+    "Jalolquduq",
+    "Xo‘jaobod",
+    "Qo‘rg‘ontepa",
+    "Marhamat",
+    "Oltinko‘l",
+    "Paxtaobod",
+    "Shahrixon",
+    "Ulug‘nor",
+  ],
+  "Buxoro viloyati": [
+    "Buxoro shahri",
+    "Buxoro",
+    "G‘ijduvon",
+    "Jondor",
+    "Kogon",
+    "Kogon shahri",
+    "Olot",
+    "Peshku",
+    "Qorako‘l",
+    "Qorovulbozor",
+    "Romitan",
+    "Shofirkon",
+    "Vobkent",
+  ],
+  "Farg‘ona viloyati": [
+    "Farg‘ona shahri",
+    "Farg‘ona",
+    "Beshariq",
+    "Bog‘dod",
+    "Buvayda",
+    "Dang‘ara",
+    "Furqat",
+    "Marg‘ilon shahri",
+    "Oltiariq",
+    "Qo‘qon shahri",
+    "Quva",
+    "Quvasoy shahri",
+    "Rishton",
+    "So‘x",
+    "Toshloq",
+    "Uchko‘prik",
+    "Yozyovon",
+  ],
+  "Jizzax viloyati": [
+    "Jizzax shahri",
+    "Arnasoy",
+    "Baxmal",
+    "Do‘stlik",
+    "Forish",
+    "G‘allaorol",
+    "Mirzacho‘l",
+    "Paxtakor",
+    "Yangiobod",
+    "Zafarobod",
+    "Zarbdor",
+    "Zomin",
+    "Sharof Rashidov",
+  ],
+  "Xorazm viloyati": [
+    "Urganch shahri",
+    "Bog‘ot",
+    "Gurlan",
+    "Hazorasp",
+    "Xiva",
+    "Xiva shahri",
+    "Qo‘shko‘pir",
+    "Shovot",
+    "Tuproqqal’a",
+    "Urganch",
+    "Xonqa",
+    "Yangiariq",
+    "Yangibozor",
+  ],
+  "Namangan viloyati": [
+    "Namangan shahri",
+    "Chortoq",
+    "Chust",
+    "Kosonsoy",
+    "Mingbuloq",
+    "Namangan",
+    "Norin",
+    "Pop",
+    "To‘raqo‘rg‘on",
+    "Uchqo‘rg‘on",
+    "Uychi",
+    "Yangiqo‘rg‘on",
+  ],
+  "Navoiy viloyati": [
+    "Navoiy shahri",
+    "Zarafshon shahri",
+    "Karmana",
+    "Konimex",
+    "Navbahor",
+    "Nurota",
+    "Qiziltepa",
+    "Tomdi",
+    "Uchquduq",
+    "Xatirchi",
+  ],
+  "Qashqadaryo viloyati": [
+    "Qarshi shahri",
+    "Shahrisabz shahri",
+    "Chiroqchi",
+    "Dehqonobod",
+    "G‘uzor",
+    "Kasbi",
+    "Kitob",
+    "Koson",
+    "Ko‘kdala",
+    "Mirishkor",
+    "Muborak",
+    "Nishon",
+    "Qamashi",
+    "Qarshi",
+    "Shahrisabz",
+    "Yakkabog‘",
+  ],
+  "Qoraqalpog‘iston Respublikasi": [
+    "Nukus shahri",
+    "Amudaryo",
+    "Beruniy",
+    "Bo‘zatov",
+    "Chimboy",
+    "Ellikqal’a",
+    "Kegeyli",
+    "Mo‘ynoq",
+    "Nukus",
+    "Qanliko‘l",
+    "Qo‘ng‘irot",
+    "Qorao‘zak",
+    "Shumanay",
+    "Taxtako‘pir",
+    "Taxiatosh",
+    "To‘rtko‘l",
+    "Xo‘jayli",
+  ],
+  "Samarqand viloyati": [
+    "Samarqand shahri",
+    "Bulung‘ur",
+    "Ishtixon",
+    "Jomboy",
+    "Kattaqo‘rg‘on",
+    "Kattaqo‘rg‘on shahri",
+    "Narpay",
+    "Nurobod",
+    "Oqdaryo",
+    "Paxtachi",
+    "Payariq",
+    "Pastdarg‘om",
+    "Qo‘shrabot",
+    "Samarqand",
+    "Toyloq",
+    "Urgut",
+  ],
+  "Sirdaryo viloyati": [
+    "Guliston shahri",
+    "Yangiyer shahri",
+    "Shirin shahri",
+    "Boyovut",
+    "Guliston",
+    "Mirzaobod",
+    "Oqoltin",
+    "Sayxunobod",
+    "Sardoba",
+    "Sirdaryo",
+    "Xovos",
+  ],
+  "Surxondaryo viloyati": [
+    "Termiz shahri",
+    "Angor",
+    "Bandixon",
+    "Boysun",
+    "Denov",
+    "Jarqo‘rg‘on",
+    "Muzrabot",
+    "Oltinsoy",
+    "Qiziriq",
+    "Qumqo‘rg‘on",
+    "Sariosiyo",
+    "Sherobod",
+    "Sho‘rchi",
+    "Termiz",
+    "Uzun",
+  ],
+};
+
+function buildAddress(parts: AddressParts) {
+  return [
+    parts.viloyat.trim(),
+    parts.tuman.trim(),
+    parts.street.trim(),
+    parts.houseNumber.trim(),
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function parseAddress(raw: string): AddressParts {
+  const value = String(raw || "").trim();
+
+  if (!value || /https?:\/\/|yandex|google|maps/i.test(value)) {
+    return {
+      viloyat: "",
+      tuman: "",
+      street: "",
+      houseNumber: "",
+    };
+  }
+
+  const parts = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return {
+    viloyat: parts[0] || "",
+    tuman: parts[1] || "",
+    street: parts[2] || "",
+    houseNumber: parts.slice(3).join(", "),
+  };
+}
+
 function getOrderUserKey(user: SavedUser) {
   if (user.telegramId) return `tg:${user.telegramId}`;
   if (user.phone) return `phone:${user.phone}`;
@@ -61,22 +352,6 @@ function saveOrderToLocalStorage(order: LocalSavedOrder) {
   }
 }
 
-function getCoordinatesFromYandexLink(address: string) {
-  const ptMatch = address.match(/pt=([\d.-]+),([\d.-]+)/);
-
-  if (!ptMatch) {
-    return {
-      latitude: null,
-      longitude: null,
-    };
-  }
-
-  return {
-    longitude: Number(ptMatch[1]),
-    latitude: Number(ptMatch[2]),
-  };
-}
-
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, clear } = useCartStore();
@@ -86,10 +361,22 @@ export default function CheckoutPage() {
   const [checkingUser, setCheckingUser] = useState(true);
 
   const [savedUser, setSavedUser] = useState<SavedUser | null>(null);
-  const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
+
+  const [viloyat, setViloyat] = useState("");
+  const [tuman, setTuman] = useState("");
+  const [street, setStreet] = useState("");
+  const [houseNumber, setHouseNumber] = useState("");
+
   const [note, setNote] = useState("");
+
+  const currentTumans = viloyat ? TUMANLAR_BY_VILOYAT[viloyat] ?? [] : [];
+
+  const formattedAddress = buildAddress({
+    viloyat,
+    tuman,
+    street,
+    houseNumber,
+  });
 
   const total = items.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
@@ -112,20 +399,32 @@ export default function CheckoutPage() {
         return;
       }
 
-      setSavedUser(user);
-      setAddress(user.address || "");
+      const parsedAddress = parseAddress(user.address || "");
 
-      if (user.address) {
-        const coords = getCoordinatesFromYandexLink(user.address);
-        setLatitude(coords.latitude);
-        setLongitude(coords.longitude);
-      }
+      setSavedUser(user);
+      setViloyat(parsedAddress.viloyat);
+      setTuman(parsedAddress.tuman);
+      setStreet(parsedAddress.street);
+      setHouseNumber(parsedAddress.houseNumber);
 
       setCheckingUser(false);
     } catch {
       router.push("/auth");
     }
   }, [router]);
+
+  useEffect(() => {
+    if (!viloyat) {
+      setTuman("");
+      return;
+    }
+
+    const availableTumans = TUMANLAR_BY_VILOYAT[viloyat] ?? [];
+
+    if (tuman && !availableTumans.includes(tuman)) {
+      setTuman("");
+    }
+  }, [viloyat, tuman]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,8 +439,8 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!address.trim()) {
-      alert("Manzilni kiriting yoki lokatsiyani yuboring");
+    if (!viloyat || !tuman || !street.trim() || !houseNumber.trim()) {
+      alert("Viloyat, tuman, ko‘cha va uy raqamini kiriting");
       return;
     }
 
@@ -154,7 +453,7 @@ export default function CheckoutPage() {
 
     try {
       const userId = savedUser.id ?? null;
-      const finalAddress = address.trim();
+      const finalAddress = formattedAddress;
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -177,26 +476,22 @@ export default function CheckoutPage() {
         return;
       }
 
-      const dbOrderItems = items.map((item) => ({
+      const orderItems = items.map((item) => ({
         order_id: order.id,
         product_id: Number(item.product.id),
         product_name: item.product.name,
         quantity: item.quantity,
         price: item.product.price,
-      }));
-
-      const apiOrderItems = items.map((item) => ({
-        order_id: order.id,
-        product_id: Number(item.product.id),
-        product_name: item.product.name,
-        quantity: item.quantity,
-        price: item.product.price,
-        moysklad_product_id: item.product.moyskladProductId || null,
+        moysklad_product_id:
+          item.product.moysklad_product_id ||
+          item.product.moyskladId ||
+          item.product.moysklad_id ||
+          null,
       }));
 
       const { error: itemsError } = await supabase
         .from("order_items")
-        .insert(dbOrderItems);
+        .insert(orderItems);
 
       if (itemsError) {
         alert(itemsError.message);
@@ -215,11 +510,9 @@ export default function CheckoutPage() {
             fullName: savedUser.fullName,
             phone: savedUser.phone,
             address: finalAddress,
-            latitude,
-            longitude,
             note,
             totalAmount: formatPrice(total),
-            items: apiOrderItems,
+            items: orderItems,
           }),
         });
       } catch (error) {
@@ -278,8 +571,8 @@ export default function CheckoutPage() {
         <div className="rounded-[28px] bg-white p-5 shadow-soft">
           <h1 className="text-2xl font-bold text-marva-900">Checkout</h1>
           <p className="mt-1 text-sm text-marva-700/70">
-            Buyurtma profilingiz asosida yuboriladi. Manzilni tasdiqlang yoki
-            kartadan lokatsiyangizni tanlang.
+            Buyurtma profilingiz asosida yuboriladi. Yetkazib berish manzilini
+            tasdiqlang yoki yangilang.
           </p>
         </div>
 
@@ -317,19 +610,74 @@ export default function CheckoutPage() {
               </p>
             </div>
 
-            <div>
+            <div className="space-y-3">
               <label className="mb-2 block text-sm font-medium text-marva-900">
                 Yetkazib berish manzili
               </label>
 
-              <DeliveryLocationField
-                address={address}
-                setAddressAction={setAddress}
-                latitude={latitude}
-                setLatitudeAction={setLatitude}
-                longitude={longitude}
-                setLongitudeAction={setLongitude}
-              />
+              <div>
+                <label className="mb-2 block text-sm font-medium text-marva-900">
+                  Viloyat
+                </label>
+                <select
+                  value={viloyat}
+                  onChange={(e) => setViloyat(e.target.value)}
+                  className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
+                >
+                  <option value="">Viloyatni tanlang</option>
+                  {VILOYATLAR.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-marva-900">
+                  Tuman
+                </label>
+                <select
+                  value={tuman}
+                  onChange={(e) => setTuman(e.target.value)}
+                  disabled={!viloyat}
+                  className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none disabled:opacity-60"
+                >
+                  <option value="">
+                    {viloyat ? "Tumanni tanlang" : "Avval viloyatni tanlang"}
+                  </option>
+
+                  {currentTumans.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-marva-900">
+                  Ko‘cha nomi
+                </label>
+                <input
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  placeholder="Masalan: Amir Temur ko‘chasi"
+                  className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-marva-900">
+                  Uy raqami
+                </label>
+                <input
+                  value={houseNumber}
+                  onChange={(e) => setHouseNumber(e.target.value)}
+                  placeholder="Masalan: 12"
+                  className="w-full rounded-2xl border border-marva-100 px-4 py-4 outline-none"
+                />
+              </div>
             </div>
 
             <textarea
