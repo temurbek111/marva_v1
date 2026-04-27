@@ -476,18 +476,14 @@ export default function CheckoutPage() {
         return;
       }
 
-      const orderItems = items.map((item) => ({
-        order_id: order.id,
-        product_id: Number(item.product.id),
-        product_name: item.product.name,
-        quantity: item.quantity,
-        price: item.product.price,
-        moysklad_product_id:
-          item.product.moysklad_product_id ||
-          item.product.moyskladId ||
-          item.product.moysklad_id ||
-          null,
-      }));
+   const orderItems = items.map((item) => ({
+  order_id: order.id,
+  product_id: Number(item.product.id),
+  product_name: item.product.name,
+  quantity: item.quantity,
+  price: item.product.price,
+  moysklad_product_id: item.product.moyskladProductId || null,
+}));
 
       const { error: itemsError } = await supabase
         .from("order_items")
