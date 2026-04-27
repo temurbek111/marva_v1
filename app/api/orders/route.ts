@@ -5,6 +5,8 @@ export const runtime = "nodejs";
 
 type OrderItem = {
   product_name?: string;
+  product_description?: string;
+  product_number?: string | number;
   quantity?: number;
   price?: number | string;
   product_id?: string | number;
@@ -75,8 +77,7 @@ function attachMoyskladIds(items: OrderItem[]): OrderItem[] {
 function buildMoyskladPositions(items: OrderItem[]) {
   return items
     .filter(
-      (item) =>
-        item.moysklad_product_id && Number(item.quantity || 0) > 0
+      (item) => item.moysklad_product_id && Number(item.quantity || 0) > 0
     )
     .map((item) => ({
       quantity: Number(item.quantity || 0),
@@ -163,33 +164,70 @@ function buildTelegramOrderText(params: TelegramOrderPayload) {
       ? params.items
           .map((item, index) => {
             const name = item.product_name || "Noma’lum mahsulot";
+            const description = item.product_description || "";
             const qty = Number(item.quantity || 0);
             const price = item.price ?? "-";
 
-            return `${index + 1}. ${name} x ${qty} — ${price}`;
+            return [
+              `${index + 1}. ${name}`,
+              description ? `   Mahsulot haqida: ${description}` : null,
+              `   Soni: ${qty} dona`,
+              `   Narxi: ${price}`,
+            ]
+              .filter(Boolean)
+              .join("\n");
           })
-          .join("\n")
+          .join("\n\n")
       : "Mahsulotlar yo‘q";
 
   return [
-    "🆕 New order",
+    "🆕 Order notification",
     `Order ID: #${params.orderId}`,
     `Client: ${params.fullName || "-"}`,
     `Phone: ${params.phone || "-"}`,
     `Address: ${params.address || "-"}`,
-    params.latitude != null && params.longitude != null
-      ? `Location: ${params.latitude}, ${params.longitude}`
-      : null,
     `Note: ${params.note || "-"}`,
     `Total: ${params.totalAmount ?? "-"}`,
-    `MoySklad: ${params.moyskladOrderName || "-"}`,
-    params.updatedStock != null ? `Updated stock: ${params.updatedStock}` : null,
+    `Order status: Yangi`,
+    `Delivery status: Dastavka biriktirilmagan`,
     "",
-    "Items:",
+    "Mahsulotlar:",
     itemsText,
+    "",
+    params.moyskladOrderName
+      ? `MoySklad: ${params.moyskladOrderName}`
+      : "MoySklad: sync pending / skipped",
+    params.updatedStock != null ? `Updated stock: ${params.updatedStock}` : null,
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function orderActionKeyboard(orderId: string) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "💾 Saqlash",
+          callback_data: `order:save:${orderId}`,
+        },
+        {
+          text: "🚚 Kuryerga berish",
+          callback_data: `order:courier:${orderId}`,
+        },
+      ],
+      [
+        {
+          text: "✅ Yetkazildi",
+          callback_data: `order:delivered:${orderId}`,
+        },
+        {
+          text: "🗑 O‘chirish",
+          callback_data: `order:delete:${orderId}`,
+        },
+      ],
+    ],
+  };
 }
 
 async function sendTelegramGroupOrder(params: TelegramOrderPayload) {
@@ -205,26 +243,7 @@ async function sendTelegramGroupOrder(params: TelegramOrderPayload) {
   await telegramBot("sendMessage", {
     chat_id: groupChatId,
     text,
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "🚚 Kuryerga berish",
-            callback_data: `order:courier:${params.orderId}`,
-          },
-          {
-            text: "✅ Yetkazildi",
-            callback_data: `order:delivered:${params.orderId}`,
-          },
-        ],
-        [
-          {
-            text: "🗑 O‘chirib tashlash",
-            callback_data: `order:delete:${params.orderId}`,
-          },
-        ],
-      ],
-    },
+    reply_markup: orderActionKeyboard(params.orderId),
   });
 }
 
@@ -252,31 +271,44 @@ export async function POST(req: Request) {
     }
 
     const rawItems = normalizeItems(items);
-    const safeItems = attachMoyskladIds(rawItems);
 
-    if (!safeItems.length) {
+    if (!rawItems.length) {
       return NextResponse.json(
         { success: false, message: "Mahsulotlar yo‘q" },
         { status: 400 }
       );
     }
 
-    const moyskladOrder = await createMoyskladOrder({
-      orderId: String(orderId),
-      fullName,
-      phone,
-      address,
-      latitude,
-      longitude,
-      note,
-      items: safeItems,
-    });
+    const safeItems = attachMoyskladIds(rawItems);
 
+    let moyskladOrderName = "";
     let updatedStock: number | null = null;
-    const firstMappedItem = safeItems.find((item) => item.moysklad_product_id);
+    let moyskladError = "";
 
-    if (firstMappedItem?.moysklad_product_id) {
-      updatedStock = await getProductStock(firstMappedItem.moysklad_product_id);
+    try {
+      const moyskladOrder = await createMoyskladOrder({
+        orderId: String(orderId),
+        fullName,
+        phone,
+        address,
+        latitude,
+        longitude,
+        note,
+        items: safeItems,
+      });
+
+      moyskladOrderName = moyskladOrder?.name || moyskladOrder?.id || "-";
+
+      const firstMappedItem = safeItems.find(
+        (item) => item.moysklad_product_id
+      );
+
+      if (firstMappedItem?.moysklad_product_id) {
+        updatedStock = await getProductStock(firstMappedItem.moysklad_product_id);
+      }
+    } catch (error: any) {
+      moyskladError = error?.message || "MoySklad sync error";
+      console.error("MOYSKLAD_SYNC_ERROR:", moyskladError);
     }
 
     const telegramPayload: TelegramOrderPayload = {
@@ -289,7 +321,7 @@ export async function POST(req: Request) {
       note,
       totalAmount,
       items: safeItems,
-      moyskladOrderName: moyskladOrder?.name || moyskladOrder?.id || "-",
+      moyskladOrderName,
       updatedStock,
     };
 
@@ -298,8 +330,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      moyskladOrderId: moyskladOrder?.id || null,
+      moyskladOrderName,
       updatedStock,
+      moyskladError: moyskladError || null,
       items: safeItems,
     });
   } catch (error: any) {
