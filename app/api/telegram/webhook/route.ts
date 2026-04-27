@@ -8,6 +8,7 @@ import {
   productsKeyboard,
   backInlineKeyboard,
 } from "@/lib/bot-menu";
+
 export const runtime = "nodejs";
 
 const processedUpdates = new Set<number>();
@@ -122,7 +123,6 @@ function buildOrdersMessage(params: {
   return [title, ownerLine, "", ...rows].filter(Boolean).join("\n\n");
 }
 
-
 function getTelegramProfileLang(update: any): BotLang {
   const code =
     update?.message?.from?.language_code ||
@@ -142,9 +142,11 @@ function getChatId(update: any): number | null {
 
 function getResolvedLang(update: any): BotLang {
   const chatId = getChatId(update);
+
   if (chatId && chatLangStore.has(chatId)) {
     return chatLangStore.get(chatId)!;
   }
+
   return getTelegramProfileLang(update);
 }
 
@@ -194,8 +196,8 @@ function logIncomingUpdate(update: any) {
     update_type: update?.message
       ? "message"
       : update?.callback_query
-      ? "callback_query"
-      : "unknown",
+        ? "callback_query"
+        : "unknown",
     chat_id: getChatId(update),
     user_id: update?.message?.from?.id || update?.callback_query?.from?.id,
     text: update?.message?.text || null,
@@ -370,51 +372,57 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-     if (action === "myOrders") {
-  const telegramUserId = getTelegramUserId(update);
+      if (action === "myOrders") {
+        const telegramUserId = getTelegramUserId(update);
 
-  if (!telegramUserId) {
-    await sendTelegram("sendMessage", {
-      chat_id: chatId,
-      text:
-        lang === "uz"
-          ? "Telegram foydalanuvchi ID topilmadi."
-          : "Не удалось определить Telegram user ID.",
-      reply_markup: backInlineKeyboard(lang),
-    });
+        await sendTelegram("sendMessage", {
+          chat_id: chatId,
+          text: `DEBUG telegramUserId=${telegramUserId}`,
+          reply_markup: backInlineKeyboard(lang),
+        });
 
-    return NextResponse.json({ ok: true });
-  }
+        if (!telegramUserId) {
+          await sendTelegram("sendMessage", {
+            chat_id: chatId,
+            text:
+              lang === "uz"
+                ? "Telegram foydalanuvchi ID topilmadi."
+                : "Не удалось определить Telegram user ID.",
+            reply_markup: backInlineKeyboard(lang),
+          });
 
-  const { customer, orders } = await getCustomerOrdersByTelegramUser(
-    telegramUserId
-  );
+          return NextResponse.json({ ok: true });
+        }
 
-  if (!customer) {
-    await sendTelegram("sendMessage", {
-      chat_id: chatId,
-      text:
-        lang === "uz"
-          ? "Profil topilmadi. Avval Mini App ichida profilingizni to‘ldiring va buyurtma bering."
-          : "Профиль не найден. Сначала заполните профиль в Mini App и оформите заказ.",
-      reply_markup: backInlineKeyboard(lang),
-    });
+        const { customer, orders } = await getCustomerOrdersByTelegramUser(
+          telegramUserId
+        );
 
-    return NextResponse.json({ ok: true });
-  }
+        if (!customer) {
+          await sendTelegram("sendMessage", {
+            chat_id: chatId,
+            text:
+              lang === "uz"
+                ? "Profil topilmadi. Avval Mini App ichida profilingizni to‘ldiring va buyurtma bering."
+                : "Профиль не найден. Сначала заполните профиль в Mini App и оформите заказ.",
+            reply_markup: backInlineKeyboard(lang),
+          });
 
-  await sendTelegram("sendMessage", {
-    chat_id: chatId,
-    text: buildOrdersMessage({
-      lang,
-      customerName: customer.full_name,
-      orders,
-    }),
-    reply_markup: backInlineKeyboard(lang),
-  });
+          return NextResponse.json({ ok: true });
+        }
 
-  return NextResponse.json({ ok: true });
-}
+        await sendTelegram("sendMessage", {
+          chat_id: chatId,
+          text: buildOrdersMessage({
+            lang,
+            customerName: customer.full_name,
+            orders,
+          }),
+          reply_markup: backInlineKeyboard(lang),
+        });
+
+        return NextResponse.json({ ok: true });
+      }
 
       if (action === "callOperator") {
         await sendTelegram("sendMessage", {
