@@ -1,20 +1,20 @@
 "use client";
 
 type ReelsButtonProps = {
-  onClick: () => void;
+  onClickAction: () => void;
   imageUrl?: string;
   hasUnseen?: boolean;
 };
 
 export default function ReelsButton({
-  onClick,
+  onClickAction,
   imageUrl,
   hasUnseen = true,
 }: ReelsButtonProps) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={onClickAction}
       aria-label="Open reels"
       className="relative flex h-11 w-11 items-center justify-center rounded-full"
     >

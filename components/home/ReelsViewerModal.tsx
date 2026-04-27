@@ -7,15 +7,15 @@ import type { Reel } from "@/lib/types";
 type ReelsViewerModalProps = {
   isOpen: boolean;
   reels: Reel[];
-  onClose: () => void;
-  onReelViewed?: (reelId: number) => void;
+  onCloseAction: () => void;
+  onReelViewedAction?: (reelId: number) => void;
 };
 
 export default function ReelsViewerModal({
   isOpen,
   reels,
-  onClose,
-  onReelViewed,
+  onCloseAction,
+  onReelViewedAction,
 }: ReelsViewerModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
@@ -31,96 +31,13 @@ export default function ReelsViewerModal({
 
   const currentReel = useMemo(() => reels[currentIndex], [reels, currentIndex]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      setCurrentIndex(0);
-      setIsVideoLoading(true);
-      setProgress(0);
-      setIsPaused(false);
-      setTranslateY(0);
-      setIsDragging(false);
-      return;
-    }
-
-    setIsMuted(false);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen || !currentReel) return;
-
-    setIsVideoLoading(true);
-    setProgress(0);
-    setIsPaused(false);
-
-    onReelViewed?.(currentReel.id);
-  }, [isOpen, currentReel, onReelViewed]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.muted = isMuted;
-
-    if (!isMuted) {
-      video.volume = 1;
-    }
-  }, [isMuted, currentIndex, isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-        return;
-      }
-
-      if (event.key === "ArrowRight") {
-        goToNext();
-        return;
-      }
-
-      if (event.key === "ArrowLeft") {
-        goToPrevious();
-        return;
-      }
-
-      if (event.key === " ") {
-        event.preventDefault();
-
-        if (videoRef.current?.paused) {
-          resumeVideo();
-        } else {
-          pauseVideo();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, currentIndex, reels.length]);
-
   const goToNext = () => {
     if (currentIndex < reels.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       return;
     }
 
-    onClose();
+    onCloseAction();
   };
 
   const goToPrevious = () => {
@@ -197,7 +114,7 @@ export default function ReelsViewerModal({
     const deltaY = touchCurrentYRef.current - touchStartYRef.current;
 
     if (deltaY > 120) {
-      onClose();
+      onCloseAction();
     } else {
       setTranslateY(0);
       setIsDragging(false);
@@ -206,6 +123,89 @@ export default function ReelsViewerModal({
     touchStartYRef.current = null;
     touchCurrentYRef.current = null;
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      setCurrentIndex(0);
+      setIsVideoLoading(true);
+      setProgress(0);
+      setIsPaused(false);
+      setTranslateY(0);
+      setIsDragging(false);
+      return;
+    }
+
+    setIsMuted(false);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !currentReel) return;
+
+    setIsVideoLoading(true);
+    setProgress(0);
+    setIsPaused(false);
+
+    onReelViewedAction?.(currentReel.id);
+  }, [isOpen, currentReel, onReelViewedAction]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.muted = isMuted;
+
+    if (!isMuted) {
+      video.volume = 1;
+    }
+  }, [isMuted, currentIndex, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCloseAction();
+        return;
+      }
+
+      if (event.key === "ArrowRight") {
+        goToNext();
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        goToPrevious();
+        return;
+      }
+
+      if (event.key === " ") {
+        event.preventDefault();
+
+        if (videoRef.current?.paused) {
+          resumeVideo();
+        } else {
+          pauseVideo();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, currentIndex, reels.length, onCloseAction]);
 
   if (!isOpen || reels.length === 0 || !currentReel) {
     return null;
@@ -260,7 +260,7 @@ export default function ReelsViewerModal({
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={onCloseAction}
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-black/45 px-4 py-2 text-sm font-medium text-white backdrop-blur"
               >
                 <X size={18} />
@@ -335,6 +335,7 @@ export default function ReelsViewerModal({
                 if (!video) return;
 
                 video.muted = isMuted;
+
                 if (!isMuted) {
                   video.volume = 1;
                 }

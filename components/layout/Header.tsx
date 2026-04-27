@@ -114,7 +114,7 @@ export function Header() {
           <div className="ml-3 flex shrink-0 items-center gap-2">
             {!isReelsLoading && reels.length > 0 && (
               <ReelsButton
-                onClick={() => setIsReelsOpen(true)}
+                onClickAction={() => setIsReelsOpen(true)}
                 imageUrl="/logo.png"
                 hasUnseen={hasUnseenReels}
               />
@@ -135,8 +135,8 @@ export function Header() {
       <ReelsViewerModal
         isOpen={isReelsOpen}
         reels={reels}
-        onClose={() => setIsReelsOpen(false)}
-        onReelViewed={handleReelViewed}
+        onCloseAction={() => setIsReelsOpen(false)}
+        onReelViewedAction={handleReelViewed}
       />
     </>
   );
