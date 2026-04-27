@@ -18,7 +18,7 @@ export default function ReelsViewerModal({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [translateY, setTranslateY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -46,7 +46,18 @@ export default function ReelsViewerModal({
     setIsVideoLoading(true);
     setProgress(0);
     setIsPaused(false);
+    setIsMuted(false);
   }, [isOpen, currentReel]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.muted = isMuted;
+    if (!isMuted) {
+      video.volume = 1;
+    }
+  }, [isMuted, currentIndex, isOpen]);
 
   const goToNext = () => {
     if (currentIndex < reels.length - 1) {
@@ -77,6 +88,21 @@ export default function ReelsViewerModal({
 
     void video.play();
     setIsPaused(false);
+  };
+
+  const toggleMute = () => {
+    const video = videoRef.current;
+    const nextMuted = !isMuted;
+
+    setIsMuted(nextMuted);
+
+    if (!video) return;
+
+    video.muted = nextMuted;
+    if (!nextMuted) {
+      video.volume = 1;
+      void video.play();
+    }
   };
 
   useEffect(() => {
@@ -169,129 +195,138 @@ export default function ReelsViewerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black">
-      <div
-        className="relative mx-auto flex h-full w-full max-w-md flex-col overflow-hidden bg-black"
-        style={{
-          transform: `translateY(${translateY}px)`,
-          transition: isDragging ? "none" : "transform 0.25s ease",
-          opacity: Math.max(0.7, 1 - translateY / 500),
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div className="absolute left-0 right-0 top-0 z-20 px-3 pt-3">
-          <div className="mb-3 flex items-center gap-1">
-            {reels.map((reel, index) => {
-              let widthClass = "w-0";
+    <div className="fixed inset-0 z-[100] bg-black/80">
+      <div className="flex min-h-screen items-center justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-[calc(env(safe-area-inset-top)+12px)]">
+        <div
+          className="relative w-full max-w-[420px] overflow-hidden rounded-[24px] bg-black shadow-2xl"
+          style={{
+            height: "min(82vh, 760px)",
+            transform: `translateY(${translateY}px)`,
+            transition: isDragging ? "none" : "transform 0.25s ease",
+            opacity: Math.max(0.7, 1 - translateY / 500),
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="absolute left-0 right-0 top-0 z-20 px-3 pt-3">
+            <div className="mb-3 flex items-center gap-1">
+              {reels.map((reel, index) => {
+                let widthClass = "w-0";
 
-              if (index < currentIndex) {
-                widthClass = "w-full";
-              } else if (index === currentIndex) {
-                widthClass = "";
-              }
+                if (index < currentIndex) {
+                  widthClass = "w-full";
+                } else if (index === currentIndex) {
+                  widthClass = "";
+                }
 
-              return (
-                <div
-                  key={reel.id}
-                  className="h-1 flex-1 overflow-hidden rounded-full bg-white/25"
-                >
+                return (
                   <div
-                    className={`h-full rounded-full bg-white transition-all duration-150 ${
-                      index === currentIndex ? "" : widthClass
-                    }`}
-                    style={
-                      index === currentIndex
-                        ? { width: `${progress}%` }
-                        : undefined
-                    }
-                  />
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-             {currentReel.title && (
-  <p className="truncate text-sm font-medium text-white">
-    {currentReel.title}
-  </p>
-)}
+                    key={reel.id}
+                    className="h-1 flex-1 overflow-hidden rounded-full bg-white/25"
+                  >
+                    <div
+                      className={`h-full rounded-full bg-white transition-all duration-150 ${
+                        index === currentIndex ? "" : widthClass
+                      }`}
+                      style={
+                        index === currentIndex
+                          ? { width: `${progress}%` }
+                          : undefined
+                      }
+                    />
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsMuted((prev) => !prev)}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-white"
-              >
-                {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-              </button>
-
+            <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-white"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-black/45 px-4 py-2 text-sm font-medium text-white backdrop-blur"
               >
-                <X size={20} />
+                <X size={18} />
+                Yopish
+              </button>
+
+              <div className="min-w-0 flex-1 text-center">
+                {currentReel.title && (
+                  <p className="truncate text-sm font-medium text-white">
+                    {currentReel.title}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={toggleMute}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur"
+              >
+                {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
             </div>
           </div>
-        </div>
 
-        <div className="relative flex-1">
-          <button
-            type="button"
-            aria-label="Previous reel"
-            onClick={goToPrevious}
-            className="absolute left-0 top-0 z-10 h-full w-1/3"
-          />
+          <div className="relative h-full w-full">
+            <button
+              type="button"
+              aria-label="Previous reel"
+              onClick={goToPrevious}
+              className="absolute left-0 top-0 z-10 h-full w-1/3"
+            />
 
-          <button
-            type="button"
-            aria-label="Next reel"
-            onClick={goToNext}
-            className="absolute right-0 top-0 z-10 h-full w-1/3"
-          />
+            <button
+              type="button"
+              aria-label="Next reel"
+              onClick={goToNext}
+              className="absolute right-0 top-0 z-10 h-full w-1/3"
+            />
 
-          <div
-            className="absolute left-1/3 right-1/3 top-0 z-10 h-full"
-            onMouseDown={pauseVideo}
-            onMouseUp={resumeVideo}
-            onMouseLeave={resumeVideo}
-            onTouchStart={pauseVideo}
-            onTouchEnd={resumeVideo}
-          />
+            <div
+              className="absolute left-1/3 right-1/3 top-0 z-10 h-full"
+              onMouseDown={pauseVideo}
+              onMouseUp={resumeVideo}
+              onMouseLeave={resumeVideo}
+              onTouchStart={pauseVideo}
+              onTouchEnd={resumeVideo}
+            />
 
-          {isVideoLoading && (
-            <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black text-white">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            </div>
-          )}
-
-         <video
-  key={currentReel.id}
-  ref={videoRef}
-  src={currentReel.video_url}
-  className="h-full w-full object-cover"
-  autoPlay
-  muted={isMuted}
-  playsInline
-  preload="auto"
-  onCanPlay={() => setIsVideoLoading(false)}
-  onEnded={goToNext}
-  controls={false}
-/>
-
-          {isPaused && !isVideoLoading && (
-            <div className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center bg-black/10">
-              <div className="rounded-full bg-black/40 px-4 py-2 text-sm font-medium text-white">
-                Pause
+            {isVideoLoading && (
+              <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black text-white">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               </div>
-            </div>
-          )}
+            )}
+
+            <video
+              key={currentReel.id}
+              ref={videoRef}
+              src={currentReel.video_url}
+              className="h-full w-full object-contain"
+              autoPlay
+              muted={isMuted}
+              playsInline
+              preload="auto"
+              onCanPlay={() => {
+                setIsVideoLoading(false);
+                const video = videoRef.current;
+                if (video && !isMuted) {
+                  video.muted = false;
+                  video.volume = 1;
+                }
+              }}
+              onEnded={goToNext}
+              controls={false}
+            />
+
+            {isPaused && !isVideoLoading && (
+              <div className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center bg-black/10">
+                <div className="rounded-full bg-black/40 px-4 py-2 text-sm font-medium text-white">
+                  Pause
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
