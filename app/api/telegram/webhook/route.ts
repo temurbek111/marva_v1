@@ -37,11 +37,7 @@ type DbOrder = {
 };
 
 function getTelegramUserId(update: any): number | null {
-  return (
-    update?.message?.from?.id ||
-    update?.callback_query?.from?.id ||
-    null
-  );
+  return update?.message?.from?.id || update?.callback_query?.from?.id || null;
 }
 
 async function getCustomerOrdersByTelegramUser(telegramUserId: number) {
@@ -196,8 +192,8 @@ function logIncomingUpdate(update: any) {
     update_type: update?.message
       ? "message"
       : update?.callback_query
-        ? "callback_query"
-        : "unknown",
+      ? "callback_query"
+      : "unknown",
     chat_id: getChatId(update),
     user_id: update?.message?.from?.id || update?.callback_query?.from?.id,
     text: update?.message?.text || null,
@@ -235,6 +231,180 @@ async function sendLanguagePicker(chatId: number, lang: BotLang) {
   });
 }
 
+async function handleOrderAction(params: {
+  callback: any;
+  chatId: number;
+  messageId?: number;
+  data: string;
+}) {
+  const { callback, chatId, messageId, data } = params;
+
+  const [, action, orderIdRaw] = data.split(":");
+  const orderId = Number(orderIdRaw);
+
+  if (!orderId || Number.isNaN(orderId)) {
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callback.id,
+      text: "Buyurtma ID noto‘g‘ri",
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "courier") {
+    const { error } = await supabaseServer
+      .from("orders")
+      .update({
+        delivery_status: "Kuryerga berildi",
+      })
+      .eq("id", orderId);
+
+    if (error) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callback.id,
+        text: error.message,
+      });
+
+      return NextResponse.json({ ok: false, message: error.message });
+    }
+
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callback.id,
+      text: `🚚 Buyurtma #${orderId} kuryerga berildi`,
+    });
+
+    await sendTelegram("sendMessage", {
+      chat_id: chatId,
+      text: `🚚 Buyurtma #${orderId} kuryerga berildi`,
+    });
+
+    if (messageId) {
+      await sendTelegram("editMessageReplyMarkup", {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "✅ Yetkazildi",
+                callback_data: `order:delivered:${orderId}`,
+              },
+            ],
+            [
+              {
+                text: "🗑 O‘chirib tashlash",
+                callback_data: `order:delete:${orderId}`,
+              },
+            ],
+          ],
+        },
+      });
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "delivered") {
+    const { error } = await supabaseServer
+      .from("orders")
+      .update({
+        order_status: "Tugallandi",
+        delivery_status: "Yetkazildi",
+      })
+      .eq("id", orderId);
+
+    if (error) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callback.id,
+        text: error.message,
+      });
+
+      return NextResponse.json({ ok: false, message: error.message });
+    }
+
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callback.id,
+      text: `✅ Buyurtma #${orderId} yetkazildi`,
+    });
+
+    await sendTelegram("sendMessage", {
+      chat_id: chatId,
+      text: `✅ Buyurtma #${orderId} yetkazildi`,
+    });
+
+    if (messageId) {
+      await sendTelegram("editMessageReplyMarkup", {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: {
+          inline_keyboard: [],
+        },
+      });
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "delete") {
+    const { error: itemsError } = await supabaseServer
+      .from("order_items")
+      .delete()
+      .eq("order_id", orderId);
+
+    if (itemsError) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callback.id,
+        text: itemsError.message,
+      });
+
+      return NextResponse.json({ ok: false, message: itemsError.message });
+    }
+
+    const { error: orderError } = await supabaseServer
+      .from("orders")
+      .delete()
+      .eq("id", orderId);
+
+    if (orderError) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callback.id,
+        text: orderError.message,
+      });
+
+      return NextResponse.json({ ok: false, message: orderError.message });
+    }
+
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callback.id,
+      text: `🗑 Buyurtma #${orderId} o‘chirildi`,
+    });
+
+    await sendTelegram("sendMessage", {
+      chat_id: chatId,
+      text: `🗑 Buyurtma #${orderId} o‘chirildi`,
+    });
+
+    if (messageId) {
+      await sendTelegram("editMessageReplyMarkup", {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: {
+          inline_keyboard: [],
+        },
+      });
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  await sendTelegram("answerCallbackQuery", {
+    callback_query_id: callback.id,
+    text: "Noma’lum amal",
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const update = await req.json();
@@ -246,6 +416,7 @@ export async function POST(req: NextRequest) {
           update_id: update.update_id,
           ts: new Date().toISOString(),
         });
+
         return NextResponse.json({ ok: true });
       }
 
@@ -296,6 +467,7 @@ export async function POST(req: NextRequest) {
               text: getText(selectedLang, "mainMenu"),
               reply_markup: mainMenuKeyboard(selectedLang),
             });
+
             return NextResponse.json({ ok: true });
           } catch (error: any) {
             console.warn("EDIT_MAIN_MENU_FAILED", {
@@ -320,6 +492,15 @@ export async function POST(req: NextRequest) {
 
         await sendMainMenu(chatId, lang);
         return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("order:")) {
+        return handleOrderAction({
+          callback,
+          chatId,
+          messageId,
+          data,
+        });
       }
 
       if (data.startsWith("accept:") || data.startsWith("cancel:")) {
@@ -374,8 +555,6 @@ export async function POST(req: NextRequest) {
 
       if (action === "myOrders") {
         const telegramUserId = getTelegramUserId(update);
-
-        
 
         if (!telegramUserId) {
           await sendTelegram("sendMessage", {
@@ -465,7 +644,6 @@ export async function POST(req: NextRequest) {
       message: error?.message || "Unknown error",
       stack: error?.stack || null,
       ts: new Date().toISOString(),
-
     });
 
     return NextResponse.json(

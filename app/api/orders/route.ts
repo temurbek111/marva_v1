@@ -165,6 +165,7 @@ function buildTelegramOrderText(params: TelegramOrderPayload) {
             const name = item.product_name || "Noma’lum mahsulot";
             const qty = Number(item.quantity || 0);
             const price = item.price ?? "-";
+
             return `${index + 1}. ${name} x ${qty} — ${price}`;
           })
           .join("\n")
@@ -207,8 +208,20 @@ async function sendTelegramGroupOrder(params: TelegramOrderPayload) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "✅ Accept", callback_data: `accept:${params.orderId}` },
-          { text: "❌ Cancel", callback_data: `cancel:${params.orderId}` },
+          {
+            text: "🚚 Kuryerga berish",
+            callback_data: `order:courier:${params.orderId}`,
+          },
+          {
+            text: "✅ Yetkazildi",
+            callback_data: `order:delivered:${params.orderId}`,
+          },
+        ],
+        [
+          {
+            text: "🗑 O‘chirib tashlash",
+            callback_data: `order:delete:${params.orderId}`,
+          },
         ],
       ],
     },
