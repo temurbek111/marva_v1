@@ -44,6 +44,10 @@ const MOYSKLAD_BASE =
 
 const MOYSKLAD_TOKEN = process.env.MOYSKLAD_TOKEN;
 
+function normalizeItems(items: unknown): OrderItem[] {
+  return Array.isArray(items) ? (items as OrderItem[]) : [];
+}
+
 function getMoyskladHeaders() {
   if (!MOYSKLAD_TOKEN) {
     throw new Error("MOYSKLAD_TOKEN topilmadi");
@@ -53,10 +57,6 @@ function getMoyskladHeaders() {
     "Content-Type": "application/json",
     Authorization: `Bearer ${MOYSKLAD_TOKEN}`,
   };
-}
-
-function normalizeItems(items: unknown): OrderItem[] {
-  return Array.isArray(items) ? (items as OrderItem[]) : [];
 }
 
 function attachMoyskladIds(items: OrderItem[]): OrderItem[] {
@@ -92,22 +92,6 @@ function buildMoyskladPositions(items: OrderItem[]) {
     }));
 }
 
-async function getProductStock(productId: string): Promise<number> {
-  const res = await fetch(`${MOYSKLAD_BASE}/entity/product/${productId}`, {
-    method: "GET",
-    headers: getMoyskladHeaders(),
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`MoySklad product olishda xato: ${text}`);
-  }
-
-  const data = await res.json();
-  return Number(data?.stock || 0);
-}
-
 async function createMoyskladOrder(params: {
   orderId: string;
   fullName?: string;
@@ -121,9 +105,7 @@ async function createMoyskladOrder(params: {
   const positions = buildMoyskladPositions(params.items);
 
   if (!positions.length) {
-    throw new Error(
-      "MoySklad uchun positions topilmadi. moysklad_product_id yuborilmadi yoki mapping topilmadi."
-    );
+    throw new Error("MoySklad positions topilmadi");
   }
 
   const payload = {
@@ -133,13 +115,8 @@ async function createMoyskladOrder(params: {
       `Mijoz: ${params.fullName || "-"}`,
       `Telefon: ${params.phone || "-"}`,
       `Manzil: ${params.address || "-"}`,
-      params.latitude != null && params.longitude != null
-        ? `Koordinata: ${params.latitude}, ${params.longitude}`
-        : null,
       `Izoh: ${params.note || "-"}`,
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    ].join("\n"),
     positions,
   };
 
@@ -165,13 +142,13 @@ function buildTelegramOrderText(params: TelegramOrderPayload) {
           .map((item, index) => {
             const name = item.product_name || "Noma’lum mahsulot";
             const description = item.product_description || "";
-            const qty = Number(item.quantity || 0);
+            const quantity = Number(item.quantity || 0);
             const price = item.price ?? "-";
 
             return [
               `${index + 1}. ${name}`,
               description ? `   Mahsulot haqida: ${description}` : null,
-              `   Soni: ${qty} dona`,
+              `   Soni: ${quantity} dona`,
               `   Narxi: ${price}`,
             ]
               .filter(Boolean)
@@ -196,8 +173,7 @@ function buildTelegramOrderText(params: TelegramOrderPayload) {
     "",
     params.moyskladOrderName
       ? `MoySklad: ${params.moyskladOrderName}`
-      : "MoySklad: sync pending / skipped",
-    params.updatedStock != null ? `Updated stock: ${params.updatedStock}` : null,
+      : "MoySklad: sync skipped",
   ]
     .filter(Boolean)
     .join("\n");
@@ -234,15 +210,12 @@ async function sendTelegramGroupOrder(params: TelegramOrderPayload) {
   const groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID;
 
   if (!groupChatId) {
-    console.warn("TELEGRAM_GROUP_CHAT_ID topilmadi, group notification skipped");
-    return;
+    throw new Error("TELEGRAM_GROUP_CHAT_ID topilmadi");
   }
-
-  const text = buildTelegramOrderText(params);
 
   await telegramBot("sendMessage", {
     chat_id: groupChatId,
-    text,
+    text: buildTelegramOrderText(params),
     reply_markup: orderActionKeyboard(params.orderId),
   });
 }
@@ -281,9 +254,25 @@ export async function POST(req: Request) {
 
     const safeItems = attachMoyskladIds(rawItems);
 
+    const telegramPayload: TelegramOrderPayload = {
+      orderId: String(orderId),
+      fullName,
+      phone,
+      address,
+      latitude,
+      longitude,
+      note,
+      totalAmount,
+      items: safeItems,
+      moyskladOrderName: "",
+      updatedStock: null,
+    };
+
+    await sendTelegramAdminOrder(telegramPayload);
+    await sendTelegramGroupOrder(telegramPayload);
+
     let moyskladOrderName = "";
-    let updatedStock: number | null = null;
-    let moyskladError = "";
+    let moyskladError: string | null = null;
 
     try {
       const moyskladOrder = await createMoyskladOrder({
@@ -298,41 +287,15 @@ export async function POST(req: Request) {
       });
 
       moyskladOrderName = moyskladOrder?.name || moyskladOrder?.id || "-";
-
-      const firstMappedItem = safeItems.find(
-        (item) => item.moysklad_product_id
-      );
-
-      if (firstMappedItem?.moysklad_product_id) {
-        updatedStock = await getProductStock(firstMappedItem.moysklad_product_id);
-      }
     } catch (error: any) {
       moyskladError = error?.message || "MoySklad sync error";
       console.error("MOYSKLAD_SYNC_ERROR:", moyskladError);
     }
 
-    const telegramPayload: TelegramOrderPayload = {
-      orderId: String(orderId),
-      fullName,
-      phone,
-      address,
-      latitude,
-      longitude,
-      note,
-      totalAmount,
-      items: safeItems,
-      moyskladOrderName,
-      updatedStock,
-    };
-
-    await sendTelegramAdminOrder(telegramPayload);
-    await sendTelegramGroupOrder(telegramPayload);
-
     return NextResponse.json({
       success: true,
       moyskladOrderName,
-      updatedStock,
-      moyskladError: moyskladError || null,
+      moyskladError,
       items: safeItems,
     });
   } catch (error: any) {
