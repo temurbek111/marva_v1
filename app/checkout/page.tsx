@@ -484,15 +484,6 @@ const orderItems = items.map((item) => ({
   price: item.product.price,
 }));
 
-const telegramOrderItems = items.map((item) => ({
-  order_id: order.id,
-  product_id: Number(item.product.id),
-  product_name: item.product.name,
-  quantity: item.quantity,
-  price: item.product.price,
-  moysklad_product_id: item.product.moyskladProductId || null,
-}));
-
 const { error: itemsError } = await supabase
   .from("order_items")
   .insert(orderItems);
@@ -516,7 +507,7 @@ const { error: itemsError } = await supabase
             address: finalAddress,
             note,
             totalAmount: formatPrice(total),
-items: telegramOrderItems,          }),
+items: orderItems,         }),
         });
       } catch (error) {
         console.error("Admin telegramga yuborishda xato:", error);
