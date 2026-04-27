@@ -375,11 +375,7 @@ export async function POST(req: NextRequest) {
       if (action === "myOrders") {
         const telegramUserId = getTelegramUserId(update);
 
-        await sendTelegram("sendMessage", {
-          chat_id: chatId,
-          text: `DEBUG telegramUserId=${telegramUserId}`,
-          reply_markup: backInlineKeyboard(lang),
-        });
+        
 
         if (!telegramUserId) {
           await sendTelegram("sendMessage", {
@@ -469,6 +465,7 @@ export async function POST(req: NextRequest) {
       message: error?.message || "Unknown error",
       stack: error?.stack || null,
       ts: new Date().toISOString(),
+
     });
 
     return NextResponse.json(
