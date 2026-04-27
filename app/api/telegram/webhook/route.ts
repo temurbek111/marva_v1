@@ -192,8 +192,8 @@ function logIncomingUpdate(update: any) {
     update_type: update?.message
       ? "message"
       : update?.callback_query
-      ? "callback_query"
-      : "unknown",
+        ? "callback_query"
+        : "unknown",
     chat_id: getChatId(update),
     user_id: update?.message?.from?.id || update?.callback_query?.from?.id,
     text: update?.message?.text || null,
@@ -251,6 +251,20 @@ async function handleOrderAction(params: {
     return NextResponse.json({ ok: true });
   }
 
+  if (action === "save") {
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callback.id,
+      text: `💾 Buyurtma #${orderId} saqlandi`,
+    });
+
+    await sendTelegram("sendMessage", {
+      chat_id: chatId,
+      text: `💾 Buyurtma #${orderId} saqlandi`,
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
   if (action === "courier") {
     const { error } = await supabaseServer
       .from("orders")
@@ -286,13 +300,17 @@ async function handleOrderAction(params: {
           inline_keyboard: [
             [
               {
+                text: "💾 Saqlash",
+                callback_data: `order:save:${orderId}`,
+              },
+              {
                 text: "✅ Yetkazildi",
                 callback_data: `order:delivered:${orderId}`,
               },
             ],
             [
               {
-                text: "🗑 O‘chirib tashlash",
+                text: "🗑 O‘chirish",
                 callback_data: `order:delete:${orderId}`,
               },
             ],
