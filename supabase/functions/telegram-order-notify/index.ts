@@ -21,8 +21,6 @@ type OrderItemRow = {
   order_id?: string | number;
   product_id?: string | number | null;
   product_name?: string | null;
-  product_description?: string | null;
-  description?: string | null;
   quantity?: number | string | null;
   price?: number | string | null;
 };
@@ -43,20 +41,16 @@ function buildItemsText(items: OrderItemRow[]) {
   return items
     .map((item, index) => {
       const name = item.product_name || "Nomsiz mahsulot";
-      const productNumber = item.product_id || item.id || "-";
-      const description = item.product_description || item.description || "";
+      const productNumber = item.product_id || "-";
       const quantity = item.quantity ?? "-";
       const price = item.price ?? "-";
 
       return [
         `${index + 1}. ${name}`,
         `   Mahsulot raqami: ${productNumber}`,
-        description ? `   Mahsulot haqida: ${description}` : null,
         `   Soni: ${quantity} dona`,
         `   Narxi: ${price}`,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      ].join("\n");
     })
     .join("\n\n");
 }
@@ -108,7 +102,11 @@ function buildText(order: OrderRow, items: OrderItemRow[]) {
   ].join("\n");
 }
 
-async function getOrderItems(orderId: string | number) {
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getOrderItemsWithRetry(orderId: string | number) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -119,21 +117,26 @@ async function getOrderItems(orderId: string | number) {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  // Small delay because the order webhook may fire before order_items insert finishes.
-  await new Promise((resolve) => setTimeout(resolve, 1200));
+  for (let attempt = 1; attempt <= 8; attempt++) {
+    const { data, error } = await supabase
+      .from("order_items")
+      .select("id, order_id, product_id, product_name, quantity, price")
+      .eq("order_id", orderId)
+      .order("id", { ascending: true });
 
-  const { data, error } = await supabase
-    .from("order_items")
-    .select("*")
-    .eq("order_id", orderId)
-    .order("id", { ascending: true });
+    if (error) {
+      console.error("ORDER_ITEMS_FETCH_ERROR", error.message);
+      return [];
+    }
 
-  if (error) {
-    console.error("ORDER_ITEMS_FETCH_ERROR", error.message);
-    return [];
+    if (data && data.length > 0) {
+      return data;
+    }
+
+    await sleep(700);
   }
 
-  return data || [];
+  return [];
 }
 
 serve(async (req) => {
@@ -174,7 +177,7 @@ serve(async (req) => {
       );
     }
 
-    const items = await getOrderItems(order.id);
+    const items = await getOrderItemsWithRetry(order.id);
     const text = buildText(order, items);
 
     const telegramRes = await fetch(
