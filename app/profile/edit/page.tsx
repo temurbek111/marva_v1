@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
+import DeliveryLocationField from "@/components/DeliveryLocationField";
 
 type SavedUser = {
   id?: number;
@@ -286,10 +287,73 @@ function buildAddress(parts: AddressParts) {
     .join(", ");
 }
 
-function parseAddress(raw: string): AddressParts {
+function isMapAddressLine(value: string) {
+  return /https?:\/\/|yandex|google|maps|koordinata|lokatsiya|location/i.test(
+    value
+  );
+}
+
+function parseCoordinates(value: string) {
+  const match = value.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+
+  if (!match) {
+    return {
+      latitude: null as number | null,
+      longitude: null as number | null,
+    };
+  }
+
+  const latitude = Number(match[1]);
+  const longitude = Number(match[2]);
+
+  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return {
+      latitude: null as number | null,
+      longitude: null as number | null,
+    };
+  }
+
+  return {
+    latitude,
+    longitude,
+  };
+}
+
+function splitSavedAddress(raw: string) {
   const value = String(raw || "").trim();
 
-  if (!value || /https?:\/\/|yandex|google|maps/i.test(value)) {
+  if (!value) {
+    return {
+      manualAddress: "",
+      mapAddress: "",
+    };
+  }
+
+  const lines = value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const manualLines = lines.filter((line) => !isMapAddressLine(line));
+  const mapLines = lines.filter((line) => isMapAddressLine(line));
+
+  if (!manualLines.length && !mapLines.length) {
+    return {
+      manualAddress: value,
+      mapAddress: "",
+    };
+  }
+
+  return {
+    manualAddress: manualLines[0] || "",
+    mapAddress: mapLines.join("\n"),
+  };
+}
+
+function parseManualAddress(raw: string): AddressParts {
+  const value = String(raw || "").trim();
+
+  if (!value) {
     return {
       viloyat: "",
       tuman: "",
@@ -311,6 +375,22 @@ function parseAddress(raw: string): AddressParts {
   };
 }
 
+function normalizeCustomerType(value?: string | null) {
+  if (!value) return "";
+
+  if (value === "student") return "student";
+  if (value === "clinic_owner") return "clinic_owner";
+  if (value === "dental_technician") return "dental_technician";
+  if (value === "other") return "other";
+
+  if (value === "dentist") return "dental_technician";
+  if (value === "clinic_staff") return "other";
+  if (value === "company_representative") return "other";
+  if (value === "regular_customer") return "other";
+
+  return "";
+}
+
 export default function ProfileEditPage() {
   const router = useRouter();
 
@@ -328,6 +408,10 @@ export default function ProfileEditPage() {
   const [street, setStreet] = useState("");
   const [houseNumber, setHouseNumber] = useState("");
 
+  const [mapAddress, setMapAddress] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
   const [customerType, setCustomerType] = useState("");
@@ -342,17 +426,29 @@ export default function ProfileEditPage() {
     houseNumber,
   });
 
+  const mapAddressLine =
+    mapAddress.trim() ||
+    (latitude !== null && longitude !== null
+      ? `Koordinata: ${latitude}, ${longitude}`
+      : "");
+
+  const finalAddress = [formattedAddress, mapAddressLine]
+    .filter(Boolean)
+    .join("\n");
+
   useEffect(() => {
     const saved = localStorage.getItem("marva-user");
 
     if (!saved) {
-      router.push("/auth");
+      router.replace("/auth");
       return;
     }
 
     try {
       const parsed: SavedUser = JSON.parse(saved);
-      const parsedAddress = parseAddress(parsed.address || "");
+      const addressParts = splitSavedAddress(parsed.address || "");
+      const parsedManualAddress = parseManualAddress(addressParts.manualAddress);
+      const parsedCoordinates = parseCoordinates(addressParts.mapAddress);
 
       setUserId(parsed.id);
       setFullName(parsed.fullName || "");
@@ -360,17 +456,22 @@ export default function ProfileEditPage() {
       setTelegramUsername(parsed.telegramUsername || "");
       setTelegramId(parsed.telegramId ?? null);
 
-      setViloyat(parsedAddress.viloyat);
-      setTuman(parsedAddress.tuman);
-      setStreet(parsedAddress.street);
-      setHouseNumber(parsedAddress.houseNumber);
+      setViloyat(parsedManualAddress.viloyat);
+      setTuman(parsedManualAddress.tuman);
+      setStreet(parsedManualAddress.street);
+      setHouseNumber(parsedManualAddress.houseNumber);
+
+      setMapAddress(addressParts.mapAddress);
+      setLatitude(parsedCoordinates.latitude);
+      setLongitude(parsedCoordinates.longitude);
 
       setAge(parsed.age ? String(parsed.age) : "");
       setGender(parsed.gender || "");
-      setCustomerType(parsed.customerType || "");
+      setCustomerType(normalizeCustomerType(parsed.customerType));
       setClinicName(parsed.clinicName || "");
     } catch {
-      router.push("/auth");
+      localStorage.removeItem("marva-user");
+      router.replace("/auth");
       return;
     } finally {
       setLoading(false);
@@ -380,6 +481,8 @@ export default function ProfileEditPage() {
   useEffect(() => {
     if (!viloyat) {
       setTuman("");
+      setStreet("");
+      setHouseNumber("");
       return;
     }
 
@@ -387,6 +490,8 @@ export default function ProfileEditPage() {
 
     if (tuman && !availableTumans.includes(tuman)) {
       setTuman("");
+      setStreet("");
+      setHouseNumber("");
     }
   }, [viloyat, tuman]);
 
@@ -401,8 +506,17 @@ export default function ProfileEditPage() {
       return;
     }
 
-    if (!viloyat || !tuman || !street.trim() || !houseNumber.trim()) {
-      alert("Viloyat, tuman, ko‘cha va uy raqamini kiriting");
+    const hasTypedAddress =
+      Boolean(viloyat) &&
+      Boolean(tuman) &&
+      Boolean(street.trim()) &&
+      Boolean(houseNumber.trim());
+
+    const hasMapLocation =
+      Boolean(mapAddress.trim()) || (latitude !== null && longitude !== null);
+
+    if (!hasTypedAddress && !hasMapLocation) {
+      alert("Manzilni kiriting yoki lokatsiyani yuboring");
       return;
     }
 
@@ -414,7 +528,7 @@ export default function ProfileEditPage() {
         fullName: fullName.trim(),
         phone: phone.trim(),
         telegramUsername: telegramUsername.trim(),
-        address: formattedAddress,
+        address: finalAddress,
         age: age.trim() || null,
         gender: gender || null,
         customerType: customerType || null,
@@ -424,7 +538,7 @@ export default function ProfileEditPage() {
 
       localStorage.setItem("marva-user", JSON.stringify(updatedUser));
       alert("Profil saqlandi");
-      router.push("/profile");
+      router.replace("/profile");
     } catch (error) {
       console.error(error);
       alert("Saqlashda xato chiqdi");
@@ -435,7 +549,7 @@ export default function ProfileEditPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F3F6F5] pb-28">
+      <div className="min-h-[100dvh] bg-[#F3F6F5] pb-28">
         <Header />
         <Container className="py-4">
           <div className="rounded-[28px] bg-white p-5 text-center text-sm text-[#6B7280] shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
@@ -448,10 +562,10 @@ export default function ProfileEditPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F6F5] pb-28">
+    <div className="min-h-[100dvh] bg-[#F3F6F5] pb-28">
       <Header />
 
-      <Container className="space-y-4 py-4">
+      <Container className="space-y-4 py-4 pb-40">
         <div className="rounded-[28px] bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
           <div className="text-[24px] font-bold text-[#12332D]">Profilim</div>
           <div className="mt-1 text-sm text-[#6B8A84]">
@@ -497,69 +611,110 @@ export default function ProfileEditPage() {
               />
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                  Viloyat
-                </label>
-                <select
-                  value={viloyat}
-                  onChange={(e) => setViloyat(e.target.value)}
-                  className="w-full rounded-[18px] border border-[#E3ECE9] bg-[#F9FBFA] px-4 py-4 text-[15px] text-[#12332D] outline-none"
-                >
-                  <option value="">Viloyatni tanlang</option>
-                  {VILOYATLAR.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
+              <label className="mb-3 block text-sm font-semibold text-[#12332D]">
+                Manzil
+              </label>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                  Tuman
-                </label>
-                <select
-                  value={tuman}
-                  onChange={(e) => setTuman(e.target.value)}
-                  disabled={!viloyat}
-                  className="w-full rounded-[18px] border border-[#E3ECE9] bg-[#F9FBFA] px-4 py-4 text-[15px] text-[#12332D] outline-none disabled:opacity-60"
-                >
-                  <option value="">
-                    {viloyat ? "Tumanni tanlang" : "Avval viloyatni tanlang"}
-                  </option>
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-[#12332D]">
+                    Viloyat
+                  </label>
 
-                  {currentTumans.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <select
+                    value={viloyat}
+                    onChange={(e) => {
+                      setViloyat(e.target.value);
+                      setTuman("");
+                      setStreet("");
+                      setHouseNumber("");
+                    }}
+                    className="w-full rounded-[18px] border border-[#E3ECE9] bg-white px-4 py-4 text-[15px] text-[#12332D] outline-none"
+                  >
+                    <option value="">Viloyatni tanlang</option>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                  Ko‘cha nomi
-                </label>
-                <input
-                  value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                  placeholder="Masalan: Amir Temur ko‘chasi"
-                  className="w-full rounded-[18px] border border-[#E3ECE9] bg-[#F9FBFA] px-4 py-4 text-[15px] text-[#12332D] outline-none"
-                />
-              </div>
+                    {VILOYATLAR.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                  Uy raqami
-                </label>
-                <input
-                  value={houseNumber}
-                  onChange={(e) => setHouseNumber(e.target.value)}
-                  placeholder="Masalan: 12"
-                  className="w-full rounded-[18px] border border-[#E3ECE9] bg-[#F9FBFA] px-4 py-4 text-[15px] text-[#12332D] outline-none"
-                />
+                {viloyat ? (
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-[#12332D]">
+                      Tuman
+                    </label>
+
+                    <select
+                      value={tuman}
+                      onChange={(e) => {
+                        setTuman(e.target.value);
+                        setStreet("");
+                        setHouseNumber("");
+                      }}
+                      className="w-full rounded-[18px] border border-[#E3ECE9] bg-white px-4 py-4 text-[15px] text-[#12332D] outline-none"
+                    >
+                      <option value="">Tumanni tanlang</option>
+
+                      {currentTumans.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
+                {tuman ? (
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-[#12332D]">
+                      Ko‘cha nomi
+                    </label>
+
+                    <input
+                      value={street}
+                      onChange={(e) => {
+                        setStreet(e.target.value);
+                        setHouseNumber("");
+                      }}
+                      placeholder="Masalan: Amir Temur ko‘chasi"
+                      className="w-full rounded-[18px] border border-[#E3ECE9] bg-white px-4 py-4 text-[15px] text-[#12332D] outline-none"
+                    />
+                  </div>
+                ) : null}
+
+                {street.trim() ? (
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-[#12332D]">
+                      Uy raqami
+                    </label>
+
+                    <input
+                      value={houseNumber}
+                      onChange={(e) => setHouseNumber(e.target.value)}
+                      placeholder="Masalan: 12"
+                      className="w-full rounded-[18px] border border-[#E3ECE9] bg-white px-4 py-4 text-[15px] text-[#12332D] outline-none"
+                    />
+                  </div>
+                ) : null}
+
+                <div className="rounded-[18px] border border-[#E3ECE9] bg-white p-3">
+                  <p className="mb-2 text-sm font-semibold text-[#12332D]">
+                    Lokatsiya
+                  </p>
+
+                  <DeliveryLocationField
+                    address={mapAddress}
+                    setAddressAction={setMapAddress}
+                    latitude={latitude}
+                    setLatitudeAction={setLatitude}
+                    longitude={longitude}
+                    setLongitudeAction={setLongitude}
+                  />
+                </div>
               </div>
             </div>
 
@@ -602,11 +757,10 @@ export default function ProfileEditPage() {
                 className="w-full rounded-[18px] border border-[#E3ECE9] bg-[#F9FBFA] px-4 py-4 text-[15px] text-[#12332D] outline-none"
               >
                 <option value="">Tanlang</option>
-                <option value="dentist">Stomatolog</option>
-                <option value="clinic_staff">Klinika xodimi</option>
-                <option value="clinic_owner">Klinika egasi</option>
-                <option value="company_representative">Kompaniya vakili</option>
-                <option value="regular_customer">Oddiy mijoz</option>
+                <option value="student">Student</option>
+                <option value="clinic_owner">Klinika rahbari</option>
+                <option value="dental_technician">Tish texnigi</option>
+                <option value="other">Boshqalar</option>
               </select>
             </div>
 

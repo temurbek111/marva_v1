@@ -65,17 +65,21 @@ function orderActionKeyboard(orderId: string) {
     inline_keyboard: [
       [
         {
-          text: "🚚 Kuryerga berish",
-          callback_data: `order:courier:${orderId}`,
+          text: "💾 Saqlash",
+          callback_data: `order:save:${orderId}`,
         },
         {
-          text: "✅ Yetkazildi",
-          callback_data: `order:delivered:${orderId}`,
+          text: "🚚 Kuryerga berish",
+          callback_data: `order:courier:${orderId}`,
         },
       ],
       [
         {
-          text: "🗑 O‘chirib tashlash",
+          text: "✅ Yetkazildi",
+          callback_data: `order:delivered:${orderId}`,
+        },
+        {
+          text: "🗑 O‘chirish",
           callback_data: `order:delete:${orderId}`,
         },
       ],

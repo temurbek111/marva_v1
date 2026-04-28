@@ -1,612 +1,517 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Header } from "@/components/layout/Header";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { Container } from "@/components/ui/Container";
+import {
+  Package,
+  ShoppingBag,
+  Clock3,
+  ChevronRight,
+  ArrowLeft,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { formatPrice } from "@/lib/utils";
 
-type OrderItemRow = {
-  id?: number;
-  order_id: number;
-  product_id?: number | null;
-  product_name?: string | null;
-  quantity?: number | null;
-  price?: number | null;
+type SavedUser = {
+  id?: number | string;
+  phone?: string;
+  telegramId?: number | string | null;
 };
 
-type OrderRow = {
-  id: number;
-  created_at?: string | null;
-  user_id?: number | null;
-  full_name?: string | null;
+type OrderItem = {
+  id?: string | number;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+};
+
+type UiOrder = {
+  id: string;
+  createdAt: string;
+  status?: string | null;
+  total: number;
+  items: OrderItem[];
+  address?: string;
+  paymentMethod?: string;
   phone?: string | null;
-  address?: string | null;
-  total_amount?: number | null;
-  order_status?: string | null;
-  delivery_status?: string | null;
-  note?: string | null;
-
-  courier_name?: string | null;
-  courier_phone?: string | null;
-  pickup_location?: string | null;
-  delivery_note?: string | null;
-
-  items?: OrderItemRow[];
 };
 
-type OrderDraft = {
-  order_status: string;
-  delivery_status: string;
-  courier_name: string;
-  courier_phone: string;
-  pickup_location: string;
-  delivery_note: string;
+type DbOrderRow = {
+  id: number;
+  created_at: string;
+  total_amount: number | null;
+  address: string | null;
+  order_status: string | null;
+  delivery_status: string | null;
+  phone: string | null;
 };
 
-const ORDER_STATUSES = ["Yangi", "Jarayonda", "Tugallandi", "Bekor qilindi"];
+type DbOrderItemRow = {
+  order_id: number;
+  product_id: number | null;
+  product_name: string | null;
+  quantity: number | null;
+  price: number | null;
+};
 
-const DELIVERY_STATUSES = [
-  "Dastavka biriktirilmagan",
-  "Kuryerga berildi",
-  "Yetkazildi",
-  "Bekor qilindi",
-];
+type DbProductRow = {
+  id: number;
+  image_url: string | null;
+  images: unknown;
+};
 
-function createDraft(order: OrderRow): OrderDraft {
+function getStatusLabel(status?: string | null) {
+  const normalized = String(status || "").toLowerCase();
+
+  if (
+    normalized.includes("processing") ||
+    normalized.includes("jarayon")
+  ) {
+    return {
+      text: "Jarayonda",
+      className: "bg-[#FFF4E5] text-[#D9822B]",
+    };
+  }
+
+  if (
+    normalized.includes("delivered") ||
+    normalized.includes("yetkaz")
+  ) {
+    return {
+      text: "Yetkazilgan",
+      className: "bg-[#ECF8F3] text-[#0A7A5A]",
+    };
+  }
+
+  if (
+    normalized.includes("cancel") ||
+    normalized.includes("bekor")
+  ) {
+    return {
+      text: "Bekor qilingan",
+      className: "bg-[#FDECEC] text-[#D94B4B]",
+    };
+  }
+
+  if (
+    normalized.includes("accept") ||
+    normalized.includes("qabul")
+  ) {
+    return {
+      text: "Qabul qilindi",
+      className: "bg-[#EEF4FF] text-[#2563EB]",
+    };
+  }
+
   return {
-    order_status: order.order_status || "Yangi",
-    delivery_status: order.delivery_status || "Dastavka biriktirilmagan",
-    courier_name: order.courier_name || "",
-    courier_phone: order.courier_phone || "",
-    pickup_location: order.pickup_location || "",
-    delivery_note: order.delivery_note || "",
+    text: "Qabul qilindi",
+    className: "bg-[#EEF4FF] text-[#2563EB]",
   };
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "-";
+function isMapLink(value?: string | null) {
+  if (!value) return false;
 
-  try {
-    return new Date(value).toLocaleString("uz-UZ");
-  } catch {
-    return value;
+  return (
+    value.includes("yandex") ||
+    value.includes("google") ||
+    value.includes("maps")
+  );
+}
+
+function getShortAddress(value?: string | null) {
+  if (!value) return "Manzil yo‘q";
+
+  if (isMapLink(value)) {
+    return "📍 Xaritada ochish";
   }
+
+  if (value.length > 40) {
+    return `${value.slice(0, 40)}...`;
+  }
+
+  return value;
 }
 
-function normalizeMoney(value?: number | null) {
-  return formatPrice(Number(value || 0));
+function getProductImage(product?: DbProductRow) {
+  if (!product) return "";
+
+  if (product.image_url && product.image_url.trim()) {
+    return product.image_url;
+  }
+
+  if (Array.isArray(product.images)) {
+    const firstImage = product.images.find(
+      (value): value is string =>
+        typeof value === "string" && value.trim().length > 0
+    );
+
+    if (firstImage) {
+      return firstImage;
+    }
+  }
+
+  return "";
 }
 
-export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState<OrderRow[]>([]);
-  const [drafts, setDrafts] = useState<Record<number, OrderDraft>>({});
+export default function OrdersPage() {
+  const router = useRouter();
+
+  const [orders, setOrders] = useState<UiOrder[]>([]);
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [savingOrderId, setSavingOrderId] = useState<number | null>(null);
-  const [errorText, setErrorText] = useState("");
 
-  const sortedOrders = useMemo(() => {
-    return [...orders].sort((a, b) => {
-      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return bTime - aTime;
-    });
-  }, [orders]);
-
-  async function loadOrders() {
-    if (!supabase) {
-      setErrorText("Supabase ulanmagan");
-      setLoading(false);
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      router.back();
       return;
     }
 
-    setLoading(true);
-    setErrorText("");
+    router.push("/profile");
+  };
 
-    try {
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
+  useEffect(() => {
+    let cancelled = false;
 
-      if (ordersError) {
-        setErrorText(ordersError.message);
-        setLoading(false);
-        return;
-      }
+    async function loadOrders() {
+      setMounted(true);
 
-      const safeOrders = (ordersData || []) as OrderRow[];
-      const orderIds = safeOrders.map((order) => order.id);
+      try {
+        const savedUser = localStorage.getItem("marva-user");
 
-      let itemsByOrderId: Record<number, OrderItemRow[]> = {};
+        if (!savedUser) {
+          if (!cancelled) {
+            setOrders([]);
+          }
+          return;
+        }
 
-      if (orderIds.length > 0) {
-        const { data: itemsData, error: itemsError } = await supabase
+        const parsedUser = JSON.parse(savedUser) as SavedUser;
+
+        if (!parsedUser?.id) {
+          if (!cancelled) {
+            setOrders([]);
+          }
+          return;
+        }
+
+        const userId = Number(parsedUser.id);
+
+        if (!Number.isFinite(userId)) {
+          if (!cancelled) {
+            setOrders([]);
+          }
+          return;
+        }
+
+        const { data: orderRows, error: ordersError } = await supabase
+          .from("orders")
+          .select(
+            "id, created_at, total_amount, address, order_status, delivery_status, phone"
+          )
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
+
+        if (ordersError) {
+          throw ordersError;
+        }
+
+        const safeOrders = (orderRows ?? []) as DbOrderRow[];
+
+        if (!safeOrders.length) {
+          if (!cancelled) {
+            setOrders([]);
+          }
+          return;
+        }
+
+        const orderIds = safeOrders.map((order) => order.id);
+
+        const { data: orderItemRows, error: itemsError } = await supabase
           .from("order_items")
-          .select("*")
+          .select("order_id, product_id, product_name, quantity, price")
           .in("order_id", orderIds);
 
         if (itemsError) {
-          console.error("Order items load error:", itemsError.message);
-        } else {
-          itemsByOrderId = ((itemsData || []) as OrderItemRow[]).reduce(
-            (acc, item) => {
-              if (!acc[item.order_id]) {
-                acc[item.order_id] = [];
-              }
+          throw itemsError;
+        }
 
-              acc[item.order_id].push(item);
-              return acc;
-            },
-            {} as Record<number, OrderItemRow[]>
+        const safeItems = (orderItemRows ?? []) as DbOrderItemRow[];
+
+        const productIds = Array.from(
+          new Set(
+            safeItems
+              .map((item) => item.product_id)
+              .filter((id): id is number => typeof id === "number")
+          )
+        );
+
+        let productsById = new Map<number, DbProductRow>();
+
+        if (productIds.length > 0) {
+          const { data: productRows, error: productsError } = await supabase
+            .from("products")
+            .select("id, image_url, images")
+            .in("id", productIds);
+
+          if (productsError) {
+            throw productsError;
+          }
+
+          const safeProducts = (productRows ?? []) as DbProductRow[];
+
+          productsById = new Map(
+            safeProducts.map((product) => [product.id, product])
           );
         }
+
+        const itemsByOrderId = new Map<number, OrderItem[]>();
+
+        for (const item of safeItems) {
+          const linkedProduct =
+            item.product_id != null
+              ? productsById.get(item.product_id)
+              : undefined;
+
+          const mappedItem: OrderItem = {
+            id:
+              item.product_id ??
+              `${item.order_id}-${item.product_name ?? "item"}`,
+            name: item.product_name || "Nomsiz mahsulot",
+            price: Number(item.price || 0),
+            quantity: Number(item.quantity || 0),
+            image: getProductImage(linkedProduct),
+          };
+
+          const currentItems = itemsByOrderId.get(item.order_id) ?? [];
+          currentItems.push(mappedItem);
+          itemsByOrderId.set(item.order_id, currentItems);
+        }
+
+        const mappedOrders: UiOrder[] = safeOrders.map((order) => ({
+          id: String(order.id),
+          createdAt: order.created_at,
+          status: order.order_status,
+          total: Number(order.total_amount || 0),
+          items: itemsByOrderId.get(order.id) ?? [],
+          address: order.address || undefined,
+          paymentMethod: undefined,
+          phone: order.phone,
+        }));
+
+        if (!cancelled) {
+          setOrders(mappedOrders);
+        }
+      } catch (error) {
+        console.error("Orders fetch error:", error);
+
+        if (!cancelled) {
+          setOrders([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-
-      const ordersWithItems = safeOrders.map((order) => ({
-        ...order,
-        items: itemsByOrderId[order.id] || [],
-      }));
-
-      setOrders(ordersWithItems);
-
-      const nextDrafts = ordersWithItems.reduce((acc, order) => {
-        acc[order.id] = createDraft(order);
-        return acc;
-      }, {} as Record<number, OrderDraft>);
-
-      setDrafts(nextDrafts);
-    } catch (error: any) {
-      setErrorText(error?.message || "Buyurtmalarni yuklashda xato");
-    } finally {
-      setLoading(false);
     }
-  }
 
-  useEffect(() => {
-    void loadOrders();
+    loadOrders();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  function updateDraft(orderId: number, key: keyof OrderDraft, value: string) {
-    setDrafts((current) => ({
-      ...current,
-      [orderId]: {
-        ...current[orderId],
-        [key]: value,
-      },
-    }));
-  }
-
-  async function updateOrderWithFallback(orderId: number, draft: OrderDraft) {
-    if (!supabase) throw new Error("Supabase ulanmagan");
-
-    const fullPayload = {
-      order_status: draft.order_status,
-      delivery_status: draft.delivery_status,
-      courier_name: draft.courier_name.trim() || null,
-      courier_phone: draft.courier_phone.trim() || null,
-      pickup_location: draft.pickup_location.trim() || null,
-      delivery_note: draft.delivery_note.trim() || null,
-    };
-
-    const { error } = await supabase
-      .from("orders")
-      .update(fullPayload)
-      .eq("id", orderId);
-
-    if (!error) return;
-
-    const message = String(error.message || "");
-
-    if (
-      message.includes("courier_name") ||
-      message.includes("courier_phone") ||
-      message.includes("pickup_location") ||
-      message.includes("delivery_note") ||
-      message.includes("schema cache")
-    ) {
-      const fallbackPayload = {
-        order_status: draft.order_status,
-        delivery_status: draft.delivery_status,
-      };
-
-      const { error: fallbackError } = await supabase
-        .from("orders")
-        .update(fallbackPayload)
-        .eq("id", orderId);
-
-      if (fallbackError) {
-        throw new Error(fallbackError.message);
-      }
-
-      return;
-    }
-
-    throw new Error(error.message);
-  }
-
-  async function saveOrder(orderId: number) {
-    const draft = drafts[orderId];
-
-    if (!draft) return;
-
-    setSavingOrderId(orderId);
-    setErrorText("");
-
-    try {
-      await updateOrderWithFallback(orderId, draft);
-      await loadOrders();
-      alert("Buyurtma saqlandi");
-    } catch (error: any) {
-      alert(error?.message || "Saqlashda xato");
-    } finally {
-      setSavingOrderId(null);
-    }
-  }
-
-  async function giveToCourier(orderId: number) {
-    const currentDraft = drafts[orderId];
-
-    if (!currentDraft) return;
-
-    const nextDraft = {
-      ...currentDraft,
-      delivery_status: "Kuryerga berildi",
-    };
-
-    setDrafts((current) => ({
-      ...current,
-      [orderId]: nextDraft,
-    }));
-
-    setSavingOrderId(orderId);
-
-    try {
-      await updateOrderWithFallback(orderId, nextDraft);
-      await loadOrders();
-    } catch (error: any) {
-      alert(error?.message || "Kuryerga berishda xato");
-    } finally {
-      setSavingOrderId(null);
-    }
-  }
-
-  async function markDelivered(orderId: number) {
-    const currentDraft = drafts[orderId];
-
-    if (!currentDraft) return;
-
-    const nextDraft = {
-      ...currentDraft,
-      order_status: "Tugallandi",
-      delivery_status: "Yetkazildi",
-    };
-
-    setDrafts((current) => ({
-      ...current,
-      [orderId]: nextDraft,
-    }));
-
-    setSavingOrderId(orderId);
-
-    try {
-      await updateOrderWithFallback(orderId, nextDraft);
-      await loadOrders();
-    } catch (error: any) {
-      alert(error?.message || "Yetkazildi qilishda xato");
-    } finally {
-      setSavingOrderId(null);
-    }
-  }
-
-  async function deleteOrder(orderId: number) {
-    if (!supabase) {
-      alert("Supabase ulanmagan");
-      return;
-    }
-
-    const confirmed = confirm(`#${orderId} buyurtmani o‘chirishni xohlaysizmi?`);
-
-    if (!confirmed) return;
-
-    setSavingOrderId(orderId);
-
-    try {
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .delete()
-        .eq("order_id", orderId);
-
-      if (itemsError) {
-        throw new Error(itemsError.message);
-      }
-
-      const { error: orderError } = await supabase
-        .from("orders")
-        .delete()
-        .eq("id", orderId);
-
-      if (orderError) {
-        throw new Error(orderError.message);
-      }
-
-      setOrders((current) => current.filter((order) => order.id !== orderId));
-    } catch (error: any) {
-      alert(error?.message || "O‘chirishda xato");
-    } finally {
-      setSavingOrderId(null);
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-[#F3F6F5] px-4 py-6">
-      <div className="mx-auto max-w-3xl space-y-4">
-        <div className="rounded-[28px] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-[#12332D]">
-                Buyurtmalar
-              </h1>
-              <p className="mt-1 text-sm text-[#5D7E78]">
-                Admin panel — buyurtmalarni boshqarish
-              </p>
-            </div>
+    <div className="min-h-screen bg-[#F3F6F5] pb-28">
+      <Header />
 
-            <button
-              type="button"
-              onClick={() => loadOrders()}
-              disabled={loading}
-              className="rounded-2xl bg-[#004F45] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              Yangilash
-            </button>
-          </div>
-        </div>
+      <Container className="pt-4">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="mb-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#12332D] shadow-sm ring-1 ring-black/5 active:scale-[0.98]"
+        >
+          <ArrowLeft size={18} />
+          Orqaga
+        </button>
+      </Container>
 
-        {errorText ? (
-          <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">
-            {errorText}
-          </div>
-        ) : null}
-
-        {loading ? (
-          <div className="rounded-[28px] bg-white p-6 text-center text-sm text-[#5D7E78] shadow-sm">
+      <Container className="pb-4">
+        {!mounted || loading ? (
+          <div className="rounded-[28px] bg-white p-5 text-center text-sm text-[#6B7280] shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
             Yuklanmoqda...
           </div>
-        ) : null}
+        ) : orders.length === 0 ? (
+          <div className="rounded-[32px] bg-white px-5 py-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]">
+              <ShoppingBag size={34} />
+            </div>
 
-        {!loading && sortedOrders.length === 0 ? (
-          <div className="rounded-[28px] bg-white p-6 text-center text-sm text-[#5D7E78] shadow-sm">
-            Buyurtmalar yo‘q
-          </div>
-        ) : null}
+            <h2 className="mt-5 text-[24px] font-bold text-[#12332D]">
+              Buyurtmalar yo‘q
+            </h2>
 
-        {sortedOrders.map((order) => {
-          const draft = drafts[order.id] || createDraft(order);
-          const isSaving = savingOrderId === order.id;
+            <p className="mt-2 text-sm leading-6 text-[#6B8A84]">
+              Hozircha sizda buyurtma yo‘q. Mahsulot tanlab, buyurtma
+              berishingiz mumkin.
+            </p>
 
-          return (
-            <div
-              key={order.id}
-              className="rounded-[28px] bg-white p-5 shadow-sm"
+            <button
+              onClick={() => router.push("/catalog")}
+              className="mt-6 rounded-full bg-[#004F45] px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,79,69,0.22)]"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-[#12332D]">
-                    #{order.id}
-                  </h2>
-                  <p className="mt-1 text-xs text-[#5D7E78]">
-                    {formatDate(order.created_at)}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-[#F3F6F5] px-4 py-2 text-right">
-                  <p className="text-xs text-[#5D7E78]">Jami</p>
-                  <p className="font-bold text-[#12332D]">
-                    {normalizeMoney(order.total_amount)}
-                  </p>
-                </div>
+              Katalogga o‘tish
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-[28px] bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
+              <div className="text-[14px] font-extrabold uppercase tracking-[0.08em] text-[#4B5563]">
+                Buyurtmalarim
               </div>
 
-              <div className="mt-4 grid gap-3 rounded-2xl bg-[#F8FBFA] p-4 text-sm text-[#12332D]">
-                <div>
-                  <p className="text-xs text-[#5D7E78]">Mijoz</p>
-                  <p className="font-semibold">{order.full_name || "-"}</p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-[#5D7E78]">Telefon</p>
-                  <p className="font-semibold">{order.phone || "-"}</p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-[#5D7E78]">Manzil</p>
-                  <p className="font-semibold">{order.address || "-"}</p>
-                </div>
-
-                {order.note ? (
-                  <div>
-                    <p className="text-xs text-[#5D7E78]">Mijoz izohi</p>
-                    <p className="font-semibold">{order.note}</p>
-                  </div>
-                ) : null}
+              <div className="mt-2 text-[28px] font-bold leading-none text-[#12332D]">
+                {orders.length} ta
               </div>
 
-              <div className="mt-4 rounded-2xl bg-[#F8FBFA] p-4">
-                <p className="mb-3 font-semibold text-[#12332D]">
-                  Mahsulotlar
-                </p>
-
-                {order.items && order.items.length > 0 ? (
-                  <div className="space-y-2">
-                    {order.items.map((item, index) => (
-                      <div
-                        key={`${order.id}-${item.id || index}`}
-                        className="rounded-xl bg-white p-3 text-sm text-[#12332D]"
-                      >
-                        <p className="font-semibold">
-                          {index + 1}. {item.product_name || "Mahsulot"}
-                        </p>
-                        <p className="mt-1 text-xs text-[#5D7E78]">
-                          {Number(item.quantity || 0)} dona x{" "}
-                          {normalizeMoney(Number(item.price || 0))}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-[#5D7E78]">Mahsulotlar yo‘q</p>
-                )}
-              </div>
-
-              <div className="mt-4 space-y-3">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                    Buyurtma statusi
-                  </label>
-                  <select
-                    value={draft.order_status}
-                    onChange={(event) =>
-                      updateDraft(
-                        order.id,
-                        "order_status",
-                        event.target.value
-                      )
-                    }
-                    className="w-full rounded-2xl border border-[#E3ECE9] bg-white px-4 py-4 outline-none"
-                  >
-                    {ORDER_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                    Dostavka statusi
-                  </label>
-                  <select
-                    value={draft.delivery_status}
-                    onChange={(event) =>
-                      updateDraft(
-                        order.id,
-                        "delivery_status",
-                        event.target.value
-                      )
-                    }
-                    className="w-full rounded-2xl border border-[#E3ECE9] bg-white px-4 py-4 outline-none"
-                  >
-                    {DELIVERY_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                    Kuryer ismi
-                  </label>
-                  <input
-                    value={draft.courier_name}
-                    onChange={(event) =>
-                      updateDraft(order.id, "courier_name", event.target.value)
-                    }
-                    placeholder="Masalan: Jasur"
-                    className="w-full rounded-2xl border border-[#E3ECE9] bg-white px-4 py-4 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                    Kuryer telefoni
-                  </label>
-                  <input
-                    value={draft.courier_phone}
-                    onChange={(event) =>
-                      updateDraft(order.id, "courier_phone", event.target.value)
-                    }
-                    placeholder="+998 90 123 45 67"
-                    className="w-full rounded-2xl border border-[#E3ECE9] bg-white px-4 py-4 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                    Qayerdan olib ketadi
-                  </label>
-                  <input
-                    value={draft.pickup_location}
-                    onChange={(event) =>
-                      updateDraft(
-                        order.id,
-                        "pickup_location",
-                        event.target.value
-                      )
-                    }
-                    placeholder="Masalan: MARVA ombori, Chilonzor"
-                    className="w-full rounded-2xl border border-[#E3ECE9] bg-white px-4 py-4 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#12332D]">
-                    Dastavka izohi
-                  </label>
-                  <textarea
-                    value={draft.delivery_note}
-                    onChange={(event) =>
-                      updateDraft(order.id, "delivery_note", event.target.value)
-                    }
-                    placeholder="Masalan: oldin telefon qilsin, 2-qavat"
-                    rows={4}
-                    className="w-full rounded-2xl border border-[#E3ECE9] bg-white px-4 py-4 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <button
-                  type="button"
-                  onClick={() => saveOrder(order.id)}
-                  disabled={isSaving}
-                  className="rounded-2xl bg-[#004F45] px-4 py-4 font-semibold text-white disabled:opacity-60"
-                >
-                  Saqlash
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => giveToCourier(order.id)}
-                  disabled={isSaving}
-                  className="rounded-2xl bg-[#006B5D] px-4 py-4 font-semibold text-white disabled:opacity-60"
-                >
-                  Kuryerga berish
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => markDelivered(order.id)}
-                  disabled={isSaving}
-                  className="rounded-2xl bg-[#16A34A] px-4 py-4 font-semibold text-white disabled:opacity-60"
-                >
-                  Yetkazildi
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => deleteOrder(order.id)}
-                  disabled={isSaving}
-                  className="rounded-2xl bg-[#DC2626] px-4 py-4 font-semibold text-white disabled:opacity-60"
-                >
-                  O‘chirish
-                </button>
+              <div className="mt-2 text-sm text-[#6B8A84]">
+                Faqat sizga tegishli buyurtmalar ko‘rinadi
               </div>
             </div>
-          );
-        })}
-      </div>
+
+            {orders.map((order) => {
+              const status = getStatusLabel(order.status);
+
+              return (
+                <div
+                  key={order.id}
+                  className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6B8A84]">
+                        Buyurtma raqami
+                      </div>
+
+                      <div className="mt-1 text-[20px] font-bold text-[#12332D]">
+                        #{order.id}
+                      </div>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-3 py-2 text-xs font-semibold ${status.className}`}
+                    >
+                      {status.text}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-[20px] bg-[#F7FAF9] p-3">
+                      <div className="flex items-center gap-2 text-[#6B8A84]">
+                        <Clock3 size={16} />
+                        <span className="text-xs font-medium">Sana</span>
+                      </div>
+
+                      <div className="mt-2 text-sm font-semibold text-[#12332D]">
+                        {new Date(order.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[20px] bg-[#F7FAF9] p-3">
+                      <div className="flex items-center gap-2 text-[#6B8A84]">
+                        <Package size={16} />
+                        <span className="text-xs font-medium">Jami</span>
+                      </div>
+
+                      <div className="mt-2 text-sm font-semibold text-[#12332D]">
+                        ${order.total}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-[22px] bg-[#F7FAF9] p-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6B8A84]">
+                      Mahsulotlar
+                    </div>
+
+                    <div className="mt-3 space-y-3">
+                      {order.items?.map((item, index) => (
+                        <div
+                          key={`${order.id}-${index}`}
+                          className="flex items-center gap-3"
+                        >
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[16px] bg-white ring-1 ring-black/5">
+                            {item.image ? (
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs font-bold text-[#004F45]">
+                                MARVA
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="line-clamp-2 text-sm font-semibold text-[#12332D]">
+                              {item.name}
+                            </div>
+
+                            <div className="mt-1 text-xs text-[#6B8A84]">
+                              {item.quantity} dona × ${item.price}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {order.address ? (
+                    <div className="mt-4 space-y-3 text-sm text-[#5D7E78]">
+                      <div className="rounded-[20px] bg-[#F7FAF9] p-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6B8A84]">
+                          Manzil
+                        </div>
+
+                        {isMapLink(order.address) ? (
+                          <a
+                            href={order.address}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#004F45] ring-1 ring-black/5"
+                          >
+                            {getShortAddress(order.address)}
+                          </a>
+                        ) : (
+                          <p className="mt-2 line-clamp-2 text-sm font-medium text-[#12332D]">
+                            {getShortAddress(order.address)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <button
+                    onClick={() => router.push("/catalog")}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-[#DCE7E4] bg-white px-4 py-3 text-sm font-semibold text-[#12332D]"
+                  >
+                    Yana buyurtma qilish
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Container>
+
+      <BottomNav />
     </div>
   );
 }
