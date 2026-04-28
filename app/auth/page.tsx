@@ -421,13 +421,13 @@ export default function AuthPage() {
     houseNumber,
   });
 
-  const locationLine = mapAddress.trim()
-    ? `Lokatsiya: ${mapAddress.trim()}`
-    : latitude !== null && longitude !== null
-    ? `Koordinata: ${latitude}, ${longitude}`
-    : null;
+  const mapAddressLine =
+    mapAddress.trim() ||
+    (latitude !== null && longitude !== null
+      ? `Koordinata: ${latitude}, ${longitude}`
+      : "");
 
-  const finalAddress = [formattedAddress, locationLine]
+  const finalAddress = [formattedAddress, mapAddressLine]
     .filter(Boolean)
     .join("\n");
 
@@ -571,57 +571,80 @@ export default function AuthPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     const hydrate = async () => {
-      const saved = localStorage.getItem("marva-user");
+      try {
+        const saved = localStorage.getItem("marva-user");
 
-      if (saved) {
-        router.push("/profile");
-        return;
-      }
-
-      const currentTgUser = tgUser || getTelegramUserSafely();
-
-      if (currentTgUser) {
-        const name = getTelegramFullName(currentTgUser);
-        const username = currentTgUser.username
-          ? normalizeTelegramUsername(currentTgUser.username)
-          : "";
-
-        setTgUser(currentTgUser);
-
-        setFullName(
-          name ||
-            (lang === "uz"
-              ? "Telegram foydalanuvchi"
-              : "Пользователь Telegram")
-        );
-
-        setTelegramUsername(username);
-
-        if (supabase && currentTgUser.id) {
-          const { data, error } = await supabase
-            .from("customers")
-            .select("*")
-            .eq("telegram_id", Number(currentTgUser.id))
-            .maybeSingle();
-
-          if (!error && data) {
-            localStorage.setItem("marva-user", JSON.stringify(toLocalUser(data)));
-            router.push("/profile");
+        if (saved) {
+          try {
+            JSON.parse(saved);
+            router.replace("/profile");
             return;
+          } catch {
+            localStorage.removeItem("marva-user");
           }
         }
-      }
 
-      setCheckingCustomer(false);
+        const currentTgUser = getTelegramUserSafely();
+
+        if (currentTgUser) {
+          const name = getTelegramFullName(currentTgUser);
+          const username = currentTgUser.username
+            ? normalizeTelegramUsername(currentTgUser.username)
+            : "";
+
+          setTgUser(currentTgUser);
+
+          setFullName(
+            name ||
+              (lang === "uz"
+                ? "Telegram foydalanuvchi"
+                : "Пользователь Telegram")
+          );
+
+          setTelegramUsername(username);
+
+          if (supabase && currentTgUser.id) {
+            const { data, error } = await supabase
+              .from("customers")
+              .select("*")
+              .eq("telegram_id", Number(currentTgUser.id))
+              .maybeSingle();
+
+            if (!error && data) {
+              localStorage.setItem(
+                "marva-user",
+                JSON.stringify(toLocalUser(data))
+              );
+
+              router.replace("/profile");
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Auth hydrate error:", error);
+      } finally {
+        if (!cancelled) {
+          setCheckingCustomer(false);
+        }
+      }
     };
 
-    hydrate();
-  }, [router, tgUser, lang]);
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, lang]);
 
   useEffect(() => {
     if (!viloyat) {
       setTuman("");
+      setStreet("");
+      setHouseNumber("");
       return;
     }
 
@@ -629,6 +652,8 @@ export default function AuthPage() {
 
     if (tuman && !availableTumans.includes(tuman)) {
       setTuman("");
+      setStreet("");
+      setHouseNumber("");
     }
   }, [viloyat, tuman]);
 
@@ -645,11 +670,20 @@ export default function AuthPage() {
       return;
     }
 
-    if (!viloyat || !tuman || !street.trim() || !houseNumber.trim()) {
+    const hasTypedAddress =
+      Boolean(viloyat) &&
+      Boolean(tuman) &&
+      Boolean(street.trim()) &&
+      Boolean(houseNumber.trim());
+
+    const hasMapLocation =
+      Boolean(mapAddress.trim()) || (latitude !== null && longitude !== null);
+
+    if (!hasTypedAddress && !hasMapLocation) {
       alert(
         lang === "uz"
-          ? "Viloyat, tuman, ko‘cha va uy raqamini kiriting"
-          : "Выберите область, район, улицу и номер дома"
+          ? "Manzilni kiriting yoki lokatsiyani yuboring"
+          : "Введите адрес или отправьте локацию"
       );
       return;
     }
@@ -737,7 +771,7 @@ export default function AuthPage() {
       }
 
       localStorage.setItem("marva-user", JSON.stringify(toLocalUser(data)));
-      router.push("/profile");
+      router.replace("/profile");
     } catch (err: any) {
       alert(
         err?.message ||
@@ -752,24 +786,23 @@ export default function AuthPage() {
 
   if (checkingCustomer) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-64">
+      <div className="min-h-[100dvh] bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-28">
         <Header />
         <Container className="py-5">
-          <div className="rounded-[32px] bg-white/95 p-6 text-center shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
-            {lang === "uz" ? "Tekshirilmoqda..." : "Проверяется..."}
+          <div className="rounded-[32px] bg-white/95 p-6 text-center text-sm text-slate-500 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
+            {lang === "uz" ? "Yuklanmoqda..." : "Загрузка..."}
           </div>
         </Container>
-        <div className="h-48" />
         <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-64">
+    <div className="min-h-[100dvh] bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-28">
       <Header />
 
-      <Container className="space-y-5 pt-5 pb-64">
+      <Container className="space-y-5 py-5 pb-32">
         <div className="overflow-hidden rounded-[32px] bg-white/95 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
           <div className="bg-[#004F45] px-5 pb-6 pt-5 text-white">
             <p className="text-sm text-white/75">
@@ -886,7 +919,12 @@ export default function AuthPage() {
 
                   <select
                     value={viloyat}
-                    onChange={(e) => setViloyat(e.target.value)}
+                    onChange={(e) => {
+                      setViloyat(e.target.value);
+                      setTuman("");
+                      setStreet("");
+                      setHouseNumber("");
+                    }}
                     className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
                   >
                     <option value="">
@@ -903,67 +941,75 @@ export default function AuthPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
-                    {lang === "uz" ? "Tuman" : "Район"}
-                  </label>
+                {viloyat ? (
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+                      {lang === "uz" ? "Tuman" : "Район"}
+                    </label>
 
-                  <select
-                    value={tuman}
-                    onChange={(e) => setTuman(e.target.value)}
-                    disabled={!viloyat}
-                    className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none disabled:opacity-60"
-                  >
-                    <option value="">
-                      {viloyat
-                        ? lang === "uz"
-                          ? "Tumanni tanlang"
-                          : "Выберите район"
-                        : lang === "uz"
-                        ? "Avval viloyatni tanlang"
-                        : "Сначала выберите область"}
-                    </option>
-
-                    {currentTumans.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
+                    <select
+                      value={tuman}
+                      onChange={(e) => {
+                        setTuman(e.target.value);
+                        setStreet("");
+                        setHouseNumber("");
+                      }}
+                      className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
+                    >
+                      <option value="">
+                        {lang === "uz" ? "Tumanni tanlang" : "Выберите район"}
                       </option>
-                    ))}
-                  </select>
-                </div>
 
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
-                    {lang === "uz" ? "Ko‘cha nomi" : "Улица"}
-                  </label>
+                      {currentTumans.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
 
-                  <input
-                    value={street}
-                    onChange={(e) => setStreet(e.target.value)}
-                    placeholder={
-                      lang === "uz"
-                        ? "Masalan: Amir Temur ko‘chasi"
-                        : "Например: улица Амира Темура"
-                    }
-                    className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
-                  />
-                </div>
+                {tuman ? (
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+                      {lang === "uz" ? "Ko‘cha nomi" : "Улица"}
+                    </label>
 
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
-                    {lang === "uz" ? "Uy raqami" : "Номер дома"}
-                  </label>
+                    <input
+                      value={street}
+                      onChange={(e) => {
+                        setStreet(e.target.value);
+                        setHouseNumber("");
+                      }}
+                      placeholder={
+                        lang === "uz"
+                          ? "Masalan: Amir Temur ko‘chasi"
+                          : "Например: улица Амира Темура"
+                      }
+                      className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
+                    />
+                  </div>
+                ) : null}
 
-                  <input
-                    value={houseNumber}
-                    onChange={(e) => setHouseNumber(e.target.value)}
-                    placeholder={lang === "uz" ? "Masalan: 12" : "Например: 12"}
-                    className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
-                  />
-                </div>
+                {street.trim() ? (
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+                      {lang === "uz" ? "Uy raqami" : "Номер дома"}
+                    </label>
 
-<div className="rounded-2xl border border-black/5 bg-white p-3">
-  <p className="mb-2 text-xs font-medium text-[#5D7E78]">
+                    <input
+                      value={houseNumber}
+                      onChange={(e) => setHouseNumber(e.target.value)}
+                      placeholder={
+                        lang === "uz" ? "Masalan: 12" : "Например: 12"
+                      }
+                      className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
+                    />
+                  </div>
+                ) : null}
+
+                <div className="rounded-2xl border border-black/5 bg-white p-3">
+                  <p className="mb-2 text-xs font-medium text-[#5D7E78]">
                     {lang === "uz" ? "Lokatsiya" : "Локация"}
                   </p>
 
@@ -1022,7 +1068,7 @@ export default function AuthPage() {
             <div className="rounded-[22px] bg-[#F8FBFA] p-4 ring-1 ring-black/5">
               <label className="mb-2 flex items-center gap-2 text-xs text-[#5D7E78]">
                 <Building2 size={14} />
-                {lang === "uz" ? "Kimligi" : "Статус"}
+                {lang === "uz" ? "Mijoz turi" : "Тип клиента"}
               </label>
 
               <select
@@ -1033,22 +1079,17 @@ export default function AuthPage() {
                 <option value="">
                   {lang === "uz" ? "Tanlang" : "Выберите"}
                 </option>
-                <option value="dentist">
-                  {lang === "uz" ? "Stomatolog" : "Стоматолог"}
-                </option>
-                <option value="clinic_staff">
-                  {lang === "uz" ? "Klinika xodimi" : "Сотрудник клиники"}
+                <option value="student">
+                  {lang === "uz" ? "Student" : "Студент"}
                 </option>
                 <option value="clinic_owner">
-                  {lang === "uz" ? "Klinika egasi" : "Владелец клиники"}
+                  {lang === "uz" ? "Klinika rahbari" : "Руководитель клиники"}
                 </option>
-                <option value="company_representative">
-                  {lang === "uz"
-                    ? "Kompaniya vakili"
-                    : "Представитель компании"}
+                <option value="dental_technician">
+                  {lang === "uz" ? "Tish texnigi" : "Зубной техник"}
                 </option>
-                <option value="regular_customer">
-                  {lang === "uz" ? "Oddiy mijoz" : "Обычный клиент"}
+                <option value="other">
+                  {lang === "uz" ? "Boshqalar" : "Другое"}
                 </option>
               </select>
             </div>
@@ -1117,7 +1158,6 @@ export default function AuthPage() {
         </div>
       </Container>
 
-      <div className="h-56" />
       <BottomNav />
     </div>
   );
