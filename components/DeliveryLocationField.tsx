@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { X } from "lucide-react";
+import { Crosshair, X } from "lucide-react";
 
 type DeliveryLocationFieldProps = {
   address: string;
@@ -63,7 +63,13 @@ function combineAddressValue(manualAddress: string, mapLink: string) {
   return "";
 }
 
-function getTelegramLocation(): Promise<TelegramLocationData> {
+function timeoutAfter(ms: number, message: string): Promise<never> {
+  return new Promise((_, reject) => {
+    window.setTimeout(() => reject(new Error(message)), ms);
+  });
+}
+
+function getTelegramLocationRaw(): Promise<TelegramLocationData> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") {
       reject(new Error("Window mavjud emas."));
@@ -99,10 +105,17 @@ function getTelegramLocation(): Promise<TelegramLocationData> {
   });
 }
 
-function getBrowserLocation(): Promise<TelegramLocationData> {
+async function getTelegramLocation(): Promise<TelegramLocationData> {
+  return Promise.race([
+    getTelegramLocationRaw(),
+    timeoutAfter(5000, "Telegram lokatsiya javob bermadi."),
+  ]);
+}
+
+function getBrowserLocationRaw(): Promise<TelegramLocationData> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined" || !navigator.geolocation) {
-      reject(new Error("Brauzer lokatsiyani qo'llab-quvvatlamaydi."));
+      reject(new Error("Brauzer lokatsiyani qo‘llab-quvvatlamaydi."));
       return;
     }
 
@@ -124,6 +137,13 @@ function getBrowserLocation(): Promise<TelegramLocationData> {
       }
     );
   });
+}
+
+async function getBrowserLocation(): Promise<TelegramLocationData> {
+  return Promise.race([
+    getBrowserLocationRaw(),
+    timeoutAfter(16000, "Brauzer lokatsiya javob bermadi."),
+  ]);
 }
 
 export default function DeliveryLocationField({
@@ -175,9 +195,9 @@ export default function DeliveryLocationField({
 
     if (horizontalAccuracy && horizontalAccuracy > 100) {
       setLocationWarning(
-        `Lokatsiya taxminiy bo'lishi mumkin. Aniqlik: ${Math.round(
+        `Lokatsiya taxminiy bo‘lishi mumkin. Aniqlik: ${Math.round(
           horizontalAccuracy
-        )} metr. Iltimos, xaritadagi pinni tekshirib qo'ying.`
+        )} metr. Iltimos, xaritadagi pinni tekshirib qo‘ying.`
       );
     } else {
       setLocationWarning("");
@@ -189,6 +209,9 @@ export default function DeliveryLocationField({
 
     if (mapInstanceRef.current) {
       mapInstanceRef.current.setView([lat, lng], 17);
+      window.setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 100);
     }
   };
 
@@ -276,7 +299,7 @@ export default function DeliveryLocationField({
     mapInstanceRef.current = map;
     markerRef.current = marker;
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       map.invalidateSize();
       map.setView([selectedLat, selectedLng], 17);
     }, 300);
@@ -298,11 +321,15 @@ export default function DeliveryLocationField({
     setLocationWarning("");
 
     try {
-      let locationData: TelegramLocationData;
+      let locationData: TelegramLocationData | null = null;
 
       try {
         locationData = await getTelegramLocation();
-      } catch {
+      } catch (telegramError) {
+        console.warn("Telegram location failed:", telegramError);
+      }
+
+      if (!locationData) {
         locationData = await getBrowserLocation();
       }
 
@@ -311,11 +338,11 @@ export default function DeliveryLocationField({
         locationData.longitude,
         locationData.horizontal_accuracy
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error("Location error:", error);
 
       setLocationWarning(
-        "Lokatsiyani avtomatik olishning imkoni bo'lmadi. Telegram yoki brauzer sozlamalarida lokatsiyaga ruxsat bering yoki xaritadan joyni qo'lda tanlang."
+        "Lokatsiyani avtomatik olishning imkoni bo‘lmadi. Telefon yoki Telegram sozlamalarida lokatsiyaga ruxsat bering. Yoki xaritadan joyni qo‘lda tanlang."
       );
     } finally {
       setLoadingLocation(false);
@@ -335,7 +362,7 @@ export default function DeliveryLocationField({
       <div className="space-y-3">
         <div>
           <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
-            Manzilni qo'lda kiriting
+            Manzilni qo‘lda kiriting
           </label>
 
           <textarea
@@ -388,7 +415,7 @@ export default function DeliveryLocationField({
 
         <p className="text-xs leading-5 text-[#5D7E78]">
           Lokatsiyani bir bosishda yuborishingiz mumkin. Xohlasangiz, xaritani
-          ochib pinni qo'lda tanlang yoki sudrang.
+          ochib pinni qo‘lda tanlang yoki sudrang.
         </p>
       </div>
 
@@ -421,9 +448,10 @@ export default function DeliveryLocationField({
                 type="button"
                 onClick={handleGetMyLocation}
                 disabled={loadingLocation}
-                className="absolute bottom-4 left-1/2 z-[1000] w-[calc(100%-32px)] -translate-x-1/2 rounded-2xl bg-[#004F45] px-4 py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-60"
+                className="absolute bottom-4 left-1/2 z-[1000] flex w-[calc(100%-32px)] -translate-x-1/2 items-center justify-center gap-2 rounded-2xl bg-[#004F45] px-4 py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-60"
               >
-                {loadingLocation ? "Lokatsiya olinmoqda..." : "📍 Meni topish"}
+                <Crosshair size={17} />
+                {loadingLocation ? "Lokatsiya olinmoqda..." : "Meni topish"}
               </button>
             </div>
 
@@ -439,6 +467,12 @@ export default function DeliveryLocationField({
                   >
                     {selectedMapLink}
                   </a>
+                </div>
+              ) : null}
+
+              {locationWarning ? (
+                <div className="max-h-20 overflow-y-auto rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+                  {locationWarning}
                 </div>
               ) : null}
 
