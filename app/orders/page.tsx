@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
-import { Package, ShoppingBag, Clock3, ChevronRight } from "lucide-react";
+import {
+  Package,
+  ShoppingBag,
+  Clock3,
+  ChevronRight,
+  ChevronLeft,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type SavedUser = {
@@ -60,40 +66,28 @@ type DbProductRow = {
 function getStatusLabel(status?: string | null) {
   const normalized = String(status || "").toLowerCase();
 
-  if (
-    normalized.includes("processing") ||
-    normalized.includes("jarayon")
-  ) {
+  if (normalized.includes("processing") || normalized.includes("jarayon")) {
     return {
       text: "Jarayonda",
       className: "bg-[#FFF4E5] text-[#D9822B]",
     };
   }
 
-  if (
-    normalized.includes("delivered") ||
-    normalized.includes("yetkaz")
-  ) {
+  if (normalized.includes("delivered") || normalized.includes("yetkaz")) {
     return {
       text: "Yetkazilgan",
       className: "bg-[#ECF8F3] text-[#0A7A5A]",
     };
   }
 
-  if (
-    normalized.includes("cancel") ||
-    normalized.includes("bekor")
-  ) {
+  if (normalized.includes("cancel") || normalized.includes("bekor")) {
     return {
       text: "Bekor qilingan",
       className: "bg-[#FDECEC] text-[#D94B4B]",
     };
   }
 
-  if (
-    normalized.includes("accept") ||
-    normalized.includes("qabul")
-  ) {
+  if (normalized.includes("accept") || normalized.includes("qabul")) {
     return {
       text: "Qabul qilindi",
       className: "bg-[#EEF4FF] text-[#2563EB]",
@@ -157,6 +151,15 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<UiOrder[]>([]);
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const goBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push("/profile");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -299,7 +302,7 @@ export default function OrdersPage() {
       }
     }
 
-    loadOrders();
+    void loadOrders();
 
     return () => {
       cancelled = true;
@@ -307,10 +310,19 @@ export default function OrdersPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F3F6F5] pb-28">
+    <div className="min-h-[100dvh] bg-[#F3F6F5] pb-28">
       <Header />
 
-      <Container className="py-4">
+      <Container className="space-y-4 py-4 pb-32">
+        <button
+          type="button"
+          onClick={goBack}
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[#12332D] shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5 active:scale-[0.98]"
+        >
+          <ChevronLeft size={18} />
+          Ortga
+        </button>
+
         {!mounted || loading ? (
           <div className="rounded-[28px] bg-white p-5 text-center text-sm text-[#6B7280] shadow-[0_10px_30px_rgba(15,23,42,0.05)] ring-1 ring-black/5">
             Yuklanmoqda...
