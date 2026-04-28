@@ -394,7 +394,7 @@ export default function DeliveryLocationField({
 
       {mapOpen ? (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4 py-4">
-          <div className="flex w-full max-w-md max-h-[86dvh] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl">
+          <div className="flex max-h-[86dvh] w-full max-w-md flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl">
             <div className="flex shrink-0 items-center justify-between border-b border-black/5 px-4 py-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-[#12332D]">
@@ -414,8 +414,17 @@ export default function DeliveryLocationField({
               </button>
             </div>
 
-            <div className="h-[48dvh] min-h-[300px] max-h-[430px] shrink-0">
+            <div className="relative h-[48dvh] min-h-[300px] max-h-[430px] shrink-0">
               <div ref={mapRef} className="h-full w-full" />
+
+              <button
+                type="button"
+                onClick={handleGetMyLocation}
+                disabled={loadingLocation}
+                className="absolute bottom-4 left-1/2 z-[1000] w-[calc(100%-32px)] -translate-x-1/2 rounded-2xl bg-[#004F45] px-4 py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-60"
+              >
+                {loadingLocation ? "Lokatsiya olinmoqda..." : "📍 Meni topish"}
+              </button>
             </div>
 
             <div className="shrink-0 space-y-3 border-t border-black/5 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
