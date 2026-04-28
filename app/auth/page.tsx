@@ -752,23 +752,24 @@ export default function AuthPage() {
 
   if (checkingCustomer) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-28">
+      <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-64">
         <Header />
         <Container className="py-5">
           <div className="rounded-[32px] bg-white/95 p-6 text-center shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
             {lang === "uz" ? "Tekshirilmoqda..." : "Проверяется..."}
           </div>
         </Container>
+        <div className="h-48" />
         <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-28">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAF9_0%,#EEF3F1_55%,#E8EFED_100%)] pb-64">
       <Header />
 
-      <Container className="space-y-5 py-5">
+      <Container className="space-y-5 pt-5 pb-64">
         <div className="overflow-hidden rounded-[32px] bg-white/95 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
           <div className="bg-[#004F45] px-5 pb-6 pt-5 text-white">
             <p className="text-sm text-white/75">
@@ -961,8 +962,8 @@ export default function AuthPage() {
                   />
                 </div>
 
-                <div className="rounded-2xl border border-black/5 bg-white p-3">
-                  <p className="mb-2 text-xs font-medium text-[#5D7E78]">
+<div className="rounded-2xl border border-black/5 bg-white p-3">
+  <p className="mb-2 text-xs font-medium text-[#5D7E78]">
                     {lang === "uz" ? "Lokatsiya" : "Локация"}
                   </p>
 
@@ -1116,6 +1117,7 @@ export default function AuthPage() {
         </div>
       </Container>
 
+      <div className="h-56" />
       <BottomNav />
     </div>
   );

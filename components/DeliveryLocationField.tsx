@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { X } from "lucide-react";
 
 type DeliveryLocationFieldProps = {
   address: string;
@@ -14,13 +15,7 @@ type DeliveryLocationFieldProps = {
 type TelegramLocationData = {
   latitude: number;
   longitude: number;
-  altitude?: number;
-  course?: number;
-  speed?: number;
   horizontal_accuracy?: number;
-  vertical_accuracy?: number;
-  course_accuracy?: number;
-  speed_accuracy?: number;
 };
 
 declare global {
@@ -49,6 +44,7 @@ function extractManualAddress(value: string) {
 
   return raw
     .replace(`Xarita: ${mapLink}`, "")
+    .replace(`Lokatsiya: ${mapLink}`, "")
     .replace(mapLink, "")
     .trim();
 }
@@ -58,7 +54,7 @@ function combineAddressValue(manualAddress: string, mapLink: string) {
   const link = mapLink.trim();
 
   if (manual && link) {
-    return `${manual}\nXarita: ${link}`;
+    return `${manual}\nLokatsiya: ${link}`;
   }
 
   if (manual) return manual;
@@ -82,16 +78,14 @@ function getTelegramLocation(): Promise<TelegramLocationData> {
     }
 
     const requestLocation = () => {
-      locationManager.getLocation(
-        (locationData: TelegramLocationData | null) => {
-          if (!locationData) {
-            reject(new Error("Telegram lokatsiyaga ruxsat bermadi."));
-            return;
-          }
-
-          resolve(locationData);
+      locationManager.getLocation((locationData: TelegramLocationData | null) => {
+        if (!locationData) {
+          reject(new Error("Telegram lokatsiyaga ruxsat bermadi."));
+          return;
         }
-      );
+
+        resolve(locationData);
+      });
     };
 
     if (locationManager.isInited) {
@@ -158,6 +152,14 @@ export default function DeliveryLocationField({
     setAddressAction(combineAddressValue(manual, mapLink));
   };
 
+  const destroyMap = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+      markerRef.current = null;
+    }
+  };
+
   const updateLocation = (
     lat: number,
     lng: number,
@@ -167,6 +169,7 @@ export default function DeliveryLocationField({
     setLongitudeAction(lng);
 
     const mapLink = makeYandexMapLink(lat, lng);
+
     setSelectedMapLink(mapLink);
     syncAddress(manualAddress, mapLink);
 
@@ -233,24 +236,18 @@ export default function DeliveryLocationField({
   }, []);
 
   useEffect(() => {
-    if (!mapOpen || !mapReady || !mapRef.current || !window.L) {
+    if (!mapOpen) {
+      destroyMap();
       return;
     }
+
+    if (!mapReady || !mapRef.current || !window.L) {
+      return;
+    }
+
+    destroyMap();
 
     const L = window.L;
-
-    if (mapInstanceRef.current) {
-      setTimeout(() => {
-        mapInstanceRef.current.invalidateSize();
-        mapInstanceRef.current.setView([selectedLat, selectedLng], 17);
-
-        if (markerRef.current) {
-          markerRef.current.setLatLng([selectedLat, selectedLng]);
-        }
-      }, 250);
-
-      return;
-    }
 
     const map = L.map(mapRef.current, {
       center: [selectedLat, selectedLng],
@@ -281,13 +278,17 @@ export default function DeliveryLocationField({
 
     setTimeout(() => {
       map.invalidateSize();
+      map.setView([selectedLat, selectedLng], 17);
     }, 300);
-  }, [mapOpen, mapReady, selectedLat, selectedLng]);
 
-  const handleManualAddressChange = (
-    e: React.ChangeEvent<HTMLTextAreaElement>
-  ) => {
-    const value = e.target.value;
+    return () => {
+      destroyMap();
+    };
+  }, [mapOpen, mapReady]);
+
+  const handleManualAddressChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.target.value;
+
     setManualAddress(value);
     syncAddress(value, selectedMapLink);
   };
@@ -314,80 +315,135 @@ export default function DeliveryLocationField({
       console.error("Location error:", error);
 
       setLocationWarning(
-        "Lokatsiyani avtomatik olishning imkoni bo'lmadi. Iltimos, Telegram yoki brauzer sozlamalarida lokatsiyaga ruxsat bering yoki xaritadan joyni qo'lda tanlang."
+        "Lokatsiyani avtomatik olishning imkoni bo'lmadi. Telegram yoki brauzer sozlamalarida lokatsiyaga ruxsat bering yoki xaritadan joyni qo'lda tanlang."
       );
     } finally {
       setLoadingLocation(false);
     }
   };
 
-  return (
-    <div className="space-y-3">
-      <div>
-        <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
-          Manzilni qo'lda kiriting
-        </label>
+  const handleOpenMap = () => {
+    setMapOpen(true);
+  };
 
-        <textarea
-          value={manualAddress}
-          onChange={handleManualAddressChange}
-          placeholder="Masalan: Toshkent sh., Chilonzor tumani, 12-kvartal, 5-uy"
-          rows={3}
-          className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none"
-        />
+  const handleCloseMap = () => {
+    setMapOpen(false);
+  };
+
+  return (
+    <>
+      <div className="space-y-3">
+        <div>
+          <label className="mb-2 block text-xs font-medium text-[#5D7E78]">
+            Manzilni qo'lda kiriting
+          </label>
+
+          <textarea
+            value={manualAddress}
+            onChange={handleManualAddressChange}
+            placeholder="Masalan: Toshkent sh., Chilonzor tumani, 12-kvartal, 5-uy"
+            rows={3}
+            className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGetMyLocation}
+          disabled={loadingLocation}
+          className="w-full rounded-2xl bg-[#004F45] px-4 py-3 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+        >
+          {loadingLocation
+            ? "Lokatsiya olinmoqda..."
+            : "📍 Mening lokatsiyamni yuborish"}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleOpenMap}
+          className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[#12332D] shadow-sm"
+        >
+          🗺 Kartani ochish
+        </button>
+
+        {selectedMapLink ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800">
+            <div className="font-semibold">Tanlangan xarita linki:</div>
+            <a
+              href={selectedMapLink}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 block break-all underline"
+            >
+              {selectedMapLink}
+            </a>
+          </div>
+        ) : null}
+
+        {locationWarning ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+            {locationWarning}
+          </div>
+        ) : null}
+
+        <p className="text-xs leading-5 text-[#5D7E78]">
+          Lokatsiyani bir bosishda yuborishingiz mumkin. Xohlasangiz, xaritani
+          ochib pinni qo'lda tanlang yoki sudrang.
+        </p>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setMapOpen((prev) => !prev)}
-        className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[#12332D] shadow-sm"
-      >
-        {mapOpen ? "🗺 Kartani yopish" : "🗺 Kartani ochish"}
-      </button>
-
       {mapOpen ? (
-        <>
-          <div className="overflow-hidden rounded-[22px] border border-black/5 bg-white shadow-sm">
-            <div ref={mapRef} className="h-[260px] w-full" />
+        <div className="fixed inset-0 z-[9999] bg-black/50 px-4 py-6">
+          <div className="mx-auto flex h-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
+              <div>
+                <p className="text-sm font-bold text-[#12332D]">
+                  Lokatsiyani tanlang
+                </p>
+                <p className="text-xs text-[#5D7E78]">
+                  Xaritadan joyni bosing yoki pinni sudrang
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseMap}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1">
+              <div ref={mapRef} className="h-full w-full" />
+            </div>
+
+            <div className="space-y-3 border-t border-black/5 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+              {selectedMapLink ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800">
+                  <div className="font-semibold">Tanlangan xarita linki:</div>
+                  <a
+                    href={selectedMapLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 block break-all underline"
+                  >
+                    {selectedMapLink}
+                  </a>
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={handleCloseMap}
+                className="w-full rounded-2xl bg-[#004F45] px-4 py-4 text-sm font-semibold text-white"
+              >
+                Joyni tasdiqlash
+              </button>
+            </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleGetMyLocation}
-            disabled={loadingLocation}
-            className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[#12332D] shadow-sm disabled:opacity-60"
-          >
-            {loadingLocation
-              ? "Lokatsiya olinmoqda..."
-              : "📍 Mening lokatsiyamni yuborish"}
-          </button>
-        </>
-      ) : null}
-
-      {selectedMapLink ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800">
-          <div className="font-semibold">Tanlangan xarita linki:</div>
-          <a
-            href={selectedMapLink}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 block break-all underline"
-          >
-            {selectedMapLink}
-          </a>
         </div>
       ) : null}
-
-      {locationWarning ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-          {locationWarning}
-        </div>
-      ) : null}
-
-      <p className="text-xs leading-5 text-[#5D7E78]">
-        Manzilni qo'lda yozishingiz mumkin. Agar xohlasangiz, "Kartani ochish"
-        tugmasini bosib xaritadan aniq joyni tanlang yoki pinni sudrang.
-      </p>
-    </div>
+    </>
   );
 }
