@@ -531,6 +531,10 @@ export default function AuthPage() {
   };
 
   const requestTelegramAutofill = async () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("marva-logged-out");
+    }
+
     const tg = getTelegramWebApp();
     const currentTgUser = getTelegramUserSafely();
 
@@ -645,7 +649,13 @@ export default function AuthPage() {
 
     const hydrate = async () => {
       try {
+        const loggedOut = localStorage.getItem("marva-logged-out") === "1";
         const saved = localStorage.getItem("marva-user");
+
+        if (loggedOut) {
+          setCheckingCustomer(false);
+          return;
+        }
 
         if (saved) {
           try {
@@ -842,6 +852,7 @@ export default function AuthPage() {
         return;
       }
 
+      localStorage.removeItem("marva-logged-out");
       localStorage.setItem("marva-user", JSON.stringify(toLocalUser(data)));
       router.replace("/profile");
     } catch (err: any) {
