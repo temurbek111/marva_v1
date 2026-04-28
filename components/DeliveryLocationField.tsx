@@ -393,14 +393,14 @@ export default function DeliveryLocationField({
       </div>
 
       {mapOpen ? (
-        <div className="fixed inset-0 z-[9999] bg-black/50 px-4 py-6">
-          <div className="mx-auto flex h-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
-              <div>
-                <p className="text-sm font-bold text-[#12332D]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4 py-4">
+          <div className="flex w-full max-w-md max-h-[86dvh] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-black/5 px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-[#12332D]">
                   Lokatsiyani tanlang
                 </p>
-                <p className="text-xs text-[#5D7E78]">
+                <p className="truncate text-xs text-[#5D7E78]">
                   Xaritadan joyni bosing yoki pinni sudrang
                 </p>
               </div>
@@ -408,19 +408,19 @@ export default function DeliveryLocationField({
               <button
                 type="button"
                 onClick={handleCloseMap}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]"
+                className="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="min-h-0 flex-1">
+            <div className="h-[48dvh] min-h-[300px] max-h-[430px] shrink-0">
               <div ref={mapRef} className="h-full w-full" />
             </div>
 
-            <div className="space-y-3 border-t border-black/5 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+            <div className="shrink-0 space-y-3 border-t border-black/5 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
               {selectedMapLink ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800">
+                <div className="max-h-20 overflow-y-auto rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800">
                   <div className="font-semibold">Tanlangan xarita linki:</div>
                   <a
                     href={selectedMapLink}
