@@ -34,3 +34,23 @@ textarea {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  background: #f7faf9;
+}
+
+#__next {
+  min-height: 100dvh;
+}
+
+@supports (height: 100dvh) {
+  body {
+    min-height: 100dvh;
+  }
+}

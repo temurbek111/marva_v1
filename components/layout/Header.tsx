@@ -99,14 +99,20 @@ export function Header() {
 
   return (
     <>
-      <div className="sticky top-0 z-40 border-b border-black/5 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-md items-center justify-between px-4 py-4">
+      <div
+        className="sticky top-0 z-40 border-b border-black/5 bg-white/95 backdrop-blur"
+        style={{
+          paddingTop:
+            "max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px))",
+        }}
+      >
+        <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="text-xs uppercase tracking-[0.24em] text-[#6B8A84]">
+            <p className="truncate text-[11px] uppercase tracking-[0.24em] text-[#6B8A84]">
               Dental market
             </p>
 
-            <h1 className="truncate text-[20px] font-bold text-[#12332D]">
+            <h1 className="truncate text-[19px] font-bold leading-6 text-[#12332D]">
               MARVA Dental shop
             </h1>
           </div>
@@ -124,9 +130,9 @@ export function Header() {
 
             <button
               type="button"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F4F7F6] text-[#12332D]"
             >
-              <Bell size={20} />
+              <Bell size={19} />
             </button>
           </div>
         </div>
