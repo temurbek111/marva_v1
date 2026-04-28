@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Container } from "@/components/ui/Container";
 import { getTelegramUser } from "@/lib/web-telegram";
+import DeliveryLocationField from "@/components/DeliveryLocationField";
 import { supabase } from "@/lib/supabase";
 import {
   Phone,
@@ -396,6 +397,10 @@ export default function AuthPage() {
   const [street, setStreet] = useState("");
   const [houseNumber, setHouseNumber] = useState("");
 
+  const [mapAddress, setMapAddress] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+
   const [telegramUsername, setTelegramUsername] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -415,6 +420,16 @@ export default function AuthPage() {
     street,
     houseNumber,
   });
+
+  const locationLine = mapAddress.trim()
+    ? `Lokatsiya: ${mapAddress.trim()}`
+    : latitude !== null && longitude !== null
+    ? `Koordinata: ${latitude}, ${longitude}`
+    : null;
+
+  const finalAddress = [formattedAddress, locationLine]
+    .filter(Boolean)
+    .join("\n");
 
   const applyTelegramUser = (user: TelegramUser | null, overwrite = false) => {
     if (!user) return;
@@ -660,7 +675,7 @@ export default function AuthPage() {
       const payload = {
         full_name: fullName.trim(),
         phone: normalizedPhone,
-        address: formattedAddress,
+        address: finalAddress,
         age: age.trim() || null,
         gender: gender || null,
         customer_type: customerType || null,
@@ -945,6 +960,21 @@ export default function AuthPage() {
                     className="h-12 w-full rounded-2xl border border-black/5 bg-white px-4 outline-none"
                   />
                 </div>
+
+                <div className="rounded-2xl border border-black/5 bg-white p-3">
+                  <p className="mb-2 text-xs font-medium text-[#5D7E78]">
+                    {lang === "uz" ? "Lokatsiya" : "Локация"}
+                  </p>
+
+                  <DeliveryLocationField
+                    address={mapAddress}
+                    setAddressAction={setMapAddress}
+                    latitude={latitude}
+                    setLatitudeAction={setLatitude}
+                    longitude={longitude}
+                    setLongitudeAction={setLongitude}
+                  />
+                </div>
               </div>
             </div>
 
@@ -1090,4 +1120,3 @@ export default function AuthPage() {
     </div>
   );
 }
-
