@@ -530,16 +530,15 @@ export default function AuthPage() {
     return data as CustomerRow | null;
   };
 
-  const requestTelegramAutofill = async () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("marva-logged-out");
-    }
+ const requestTelegramAutofill = async () => {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("marva-logged-out");
+  }
 
-    const tg = getTelegramWebApp();
-    const currentTgUser = getTelegramUserSafely();
+  const tg = getTelegramWebApp();
+  const currentTgUser = getTelegramUserSafely();
 
-    applyTelegramUser(currentTgUser, true);
-
+  applyTelegramUser(currentTgUser, true);
     if (!tg) {
       alert(
         lang === "uz"

@@ -183,11 +183,11 @@ export default function ProfilePage() {
     fetchOrdersCount();
   }, [user]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("marva-user");
-    router.push("/auth");
-  };
-
+ const handleLogout = () => {
+  localStorage.removeItem("marva-user");
+  localStorage.setItem("marva-logged-out", "1");
+  router.replace("/auth");
+};
   if (!mounted) return null;
 
   if (!user) {
@@ -328,3 +328,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
