@@ -450,7 +450,87 @@ export default function AuthPage() {
     }
   };
 
-  const requestTelegramAutofill = () => {
+  const applyCustomerRowToForm = (customer: CustomerRow) => {
+    setFullName(customer.full_name || "");
+    setPhone(customer.phone || "");
+    setTelegramUsername(customer.telegram_username || "");
+    setAge(customer.age || "");
+    setGender(customer.gender || "");
+    setCustomerType(customer.customer_type || "");
+    setClinicName(customer.clinic_name || "");
+
+    const address = String(customer.address || "").trim();
+
+    if (!address) return;
+
+    const lines = address
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const manualLine =
+      lines.find(
+        (line) =>
+          !/koordinata|lokatsiya|location|maps|google|yandex|http/i.test(line)
+      ) || "";
+
+    const locationLine =
+      lines.find((line) =>
+        /koordinata|lokatsiya|location|maps|google|yandex|http/i.test(line)
+      ) || "";
+
+    if (manualLine) {
+      const parts = manualLine
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+      setViloyat(parts[0] || "");
+      setTuman(parts[1] || "");
+      setStreet(parts[2] || "");
+      setHouseNumber(parts.slice(3).join(", "));
+    }
+
+    if (locationLine) {
+      setMapAddress(locationLine);
+
+      const coordinateMatch = locationLine.match(
+        /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/
+      );
+
+      if (coordinateMatch) {
+        const nextLatitude = Number(coordinateMatch[1]);
+        const nextLongitude = Number(coordinateMatch[2]);
+
+        if (!Number.isNaN(nextLatitude)) {
+          setLatitude(nextLatitude);
+        }
+
+        if (!Number.isNaN(nextLongitude)) {
+          setLongitude(nextLongitude);
+        }
+      }
+    }
+  };
+
+  const loadCustomerByTelegramId = async (telegramId: number) => {
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("telegram_id", telegramId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Telegram customer autofill error:", error);
+      return null;
+    }
+
+    return data as CustomerRow | null;
+  };
+
+  const requestTelegramAutofill = async () => {
     const tg = getTelegramWebApp();
     const currentTgUser = getTelegramUserSafely();
 
@@ -459,8 +539,8 @@ export default function AuthPage() {
     if (!tg) {
       alert(
         lang === "uz"
-          ? "Telegram Mini App ichida ochilganda ma'lumotlar avtomatik olinadi."
-          : "Автозаполнение работает внутри Telegram Mini App."
+          ? "Telegram Mini App ichida ochilganda ism va username avtomatik olinadi."
+          : "Имя и username автоматически заполняются внутри Telegram Mini App."
       );
       return;
     }
@@ -482,67 +562,51 @@ export default function AuthPage() {
       return;
     }
 
-    const askContact = () => {
-      if (!tg.requestContact) {
+    const customer = await loadCustomerByTelegramId(Number(currentTgUser.id));
+
+    if (customer) {
+      applyCustomerRowToForm(customer);
+
+      setTelegramStatus(
+        lang === "uz"
+          ? "Telegram profilingiz va oldingi ma'lumotlaringiz avtomatik to‘ldirildi."
+          : "Ваш Telegram профиль и сохранённые данные заполнены автоматически."
+      );
+
+      return;
+    }
+
+    setTelegramStatus(
+      lang === "uz"
+        ? "Telegramdan ism va username olindi. Telefon raqamni qo‘lda kiriting."
+        : "Имя и username получены из Telegram. Введите телефон вручную."
+    );
+
+    if (!tg.requestContact) {
+      return;
+    }
+
+    setTelegramContactRequested(true);
+
+    tg.requestContact((shared: boolean) => {
+      if (shared) {
+        tg.HapticFeedback?.notificationOccurred?.("success");
+
         setTelegramStatus(
           lang === "uz"
-            ? "Telegram kontakt so‘rovi bu versiyada ishlamayapti. Telefonni qo‘lda kiriting."
-            : "Запрос контакта не поддерживается в этой версии Telegram. Введите телефон вручную."
+            ? "Kontakt ulashildi, lekin Telegram telefonni frontendga bermaydi. Telefonni qo‘lda kiriting."
+            : "Контакт был разрешён, но Telegram не передаёт номер напрямую во frontend. Введите телефон вручную."
         );
-        return;
+      } else {
+        tg.HapticFeedback?.notificationOccurred?.("warning");
+
+        setTelegramStatus(
+          lang === "uz"
+            ? "Telefon raqam ulashilmadi. Telefonni qo‘lda kiriting."
+            : "Номер телефона не был передан. Введите телефон вручную."
+        );
       }
-
-      setTelegramContactRequested(true);
-
-      tg.requestContact((shared: boolean) => {
-        if (shared) {
-          tg.HapticFeedback?.notificationOccurred?.("success");
-
-          setTelegramStatus(
-            lang === "uz"
-              ? "Telegram ma'lumotlari olindi. Telefon avtomatik tushmasa, uni qo‘lda kiriting."
-              : "Данные Telegram получены. Если телефон не заполнился автоматически, введите его вручную."
-          );
-        } else {
-          tg.HapticFeedback?.notificationOccurred?.("warning");
-
-          setTelegramStatus(
-            lang === "uz"
-              ? "Telefon raqam ulashilmadi. Telefonni qo‘lda kiriting."
-              : "Номер телефона не был передан. Введите телефон вручную."
-          );
-        }
-      });
-    };
-
-    if (tg.showConfirm) {
-      tg.showConfirm(
-        lang === "uz"
-          ? "Telegram ma'lumotlaringiz bilan formani to‘ldiraymi?"
-          : "Заполнить форму данными из Telegram?",
-        (confirmed: boolean) => {
-          if (confirmed) {
-            askContact();
-          }
-        }
-      );
-    } else {
-      askContact();
-    }
-
-    if (currentTgUser?.username) {
-      setTelegramStatus(
-        lang === "uz"
-          ? `Telegram username olindi: @${currentTgUser.username}`
-          : `Telegram username получен: @${currentTgUser.username}`
-      );
-    } else {
-      setTelegramStatus(
-        lang === "uz"
-          ? "Telegram ulandi, lekin profilingizda username yo‘q. Username bo‘lmasa, qo‘lda kiritishingiz mumkin."
-          : "Telegram подключен, но username отсутствует. Можно ввести вручную."
-      );
-    }
+    });
   };
 
   useEffect(() => {
@@ -551,21 +615,27 @@ export default function AuthPage() {
     tg?.ready?.();
     tg?.expand?.();
 
-    const loadTelegramUser = () => {
+    const loadTelegramUser = async () => {
       const user = getTelegramUserSafely();
 
-      if (!user) return null;
+      if (!user) return;
 
       applyTelegramUser(user);
 
-      return user;
+      if (user.id) {
+        const customer = await loadCustomerByTelegramId(Number(user.id));
+
+        if (customer) {
+          applyCustomerRowToForm(customer);
+        }
+      }
     };
 
-    loadTelegramUser();
+    void loadTelegramUser();
 
     const timer = setTimeout(() => {
-      loadTelegramUser();
-    }, 500);
+      void loadTelegramUser();
+    }, 700);
 
     return () => clearTimeout(timer);
   }, []);
@@ -614,9 +684,11 @@ export default function AuthPage() {
               .maybeSingle();
 
             if (!error && data) {
+              applyCustomerRowToForm(data as CustomerRow);
+
               localStorage.setItem(
                 "marva-user",
-                JSON.stringify(toLocalUser(data))
+                JSON.stringify(toLocalUser(data as CustomerRow))
               );
 
               router.replace("/profile");
@@ -729,7 +801,7 @@ export default function AuthPage() {
           .select("*")
           .single();
 
-        data = result.data;
+        data = result.data as CustomerRow | null;
         error = result.error;
       } else {
         const { data: existingByPhone } = await supabase
@@ -746,7 +818,7 @@ export default function AuthPage() {
             .select("*")
             .single();
 
-          data = result.data;
+          data = result.data as CustomerRow | null;
           error = result.error;
         } else {
           const result = await supabase
@@ -755,7 +827,7 @@ export default function AuthPage() {
             .select("*")
             .single();
 
-          data = result.data;
+          data = result.data as CustomerRow | null;
           error = result.error;
         }
       }
