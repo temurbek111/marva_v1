@@ -12,10 +12,10 @@ type DeliveryLocationFieldProps = {
   setLongitudeAction: (value: number | null) => void;
 };
 
-type TelegramLocationData = {
+type LocationData = {
   latitude: number;
   longitude: number;
-  horizontal_accuracy?: number;
+  accuracy?: number;
 };
 
 declare global {
@@ -63,87 +63,54 @@ function combineAddressValue(manualAddress: string, mapLink: string) {
   return "";
 }
 
-function timeoutAfter(ms: number, message: string): Promise<never> {
-  return new Promise((_, reject) => {
-    window.setTimeout(() => reject(new Error(message)), ms);
-  });
-}
-
-function getTelegramLocationRaw(): Promise<TelegramLocationData> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === "undefined") {
-      reject(new Error("Window mavjud emas."));
-      return;
-    }
-
-    const locationManager = (window as any).Telegram?.WebApp?.LocationManager;
-
-    if (!locationManager?.init || !locationManager?.getLocation) {
-      reject(new Error("Telegram LocationManager mavjud emas."));
-      return;
-    }
-
-    const requestLocation = () => {
-      locationManager.getLocation((locationData: TelegramLocationData | null) => {
-        if (!locationData) {
-          reject(new Error("Telegram lokatsiyaga ruxsat bermadi."));
-          return;
-        }
-
-        resolve(locationData);
-      });
-    };
-
-    if (locationManager.isInited) {
-      requestLocation();
-      return;
-    }
-
-    locationManager.init(() => {
-      requestLocation();
-    });
-  });
-}
-
-async function getTelegramLocation(): Promise<TelegramLocationData> {
-  return Promise.race([
-    getTelegramLocationRaw(),
-    timeoutAfter(5000, "Telegram lokatsiya javob bermadi."),
-  ]);
-}
-
-function getBrowserLocationRaw(): Promise<TelegramLocationData> {
+function getBrowserLocationWithHardTimeout(): Promise<LocationData> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined" || !navigator.geolocation) {
       reject(new Error("Brauzer lokatsiyani qo‘llab-quvvatlamaydi."));
       return;
     }
 
+    let finished = false;
+
+    const hardTimer = window.setTimeout(() => {
+      if (finished) return;
+
+      finished = true;
+      reject(
+        new Error(
+          "Lokatsiya olish vaqti tugadi. Ruxsat berilmagan yoki Telegram/Chrome lokatsiyani qaytarmadi."
+        )
+      );
+    }, 10000);
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (finished) return;
+
+        finished = true;
+        window.clearTimeout(hardTimer);
+
         resolve({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          horizontal_accuracy: position.coords.accuracy,
+          accuracy: position.coords.accuracy,
         });
       },
       (error) => {
+        if (finished) return;
+
+        finished = true;
+        window.clearTimeout(hardTimer);
+
         reject(error);
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 8000,
         maximumAge: 0,
       }
     );
   });
-}
-
-async function getBrowserLocation(): Promise<TelegramLocationData> {
-  return Promise.race([
-    getBrowserLocationRaw(),
-    timeoutAfter(16000, "Brauzer lokatsiya javob bermadi."),
-  ]);
 }
 
 export default function DeliveryLocationField({
@@ -180,11 +147,7 @@ export default function DeliveryLocationField({
     }
   };
 
-  const updateLocation = (
-    lat: number,
-    lng: number,
-    horizontalAccuracy?: number
-  ) => {
+  const updateLocation = (lat: number, lng: number, accuracy?: number) => {
     setLatitudeAction(lat);
     setLongitudeAction(lng);
 
@@ -193,11 +156,11 @@ export default function DeliveryLocationField({
     setSelectedMapLink(mapLink);
     syncAddress(manualAddress, mapLink);
 
-    if (horizontalAccuracy && horizontalAccuracy > 100) {
+    if (accuracy && accuracy > 100) {
       setLocationWarning(
         `Lokatsiya taxminiy bo‘lishi mumkin. Aniqlik: ${Math.round(
-          horizontalAccuracy
-        )} metr. Iltimos, xaritadagi pinni tekshirib qo‘ying.`
+          accuracy
+        )} metr. Xaritadagi pinni tekshirib qo‘ying.`
       );
     } else {
       setLocationWarning("");
@@ -209,6 +172,7 @@ export default function DeliveryLocationField({
 
     if (mapInstanceRef.current) {
       mapInstanceRef.current.setView([lat, lng], 17);
+
       window.setTimeout(() => {
         mapInstanceRef.current?.invalidateSize();
       }, 100);
@@ -317,32 +281,24 @@ export default function DeliveryLocationField({
   };
 
   const handleGetMyLocation = async () => {
+    if (loadingLocation) return;
+
     setLoadingLocation(true);
     setLocationWarning("");
 
     try {
-      let locationData: TelegramLocationData | null = null;
-
-      try {
-        locationData = await getTelegramLocation();
-      } catch (telegramError) {
-        console.warn("Telegram location failed:", telegramError);
-      }
-
-      if (!locationData) {
-        locationData = await getBrowserLocation();
-      }
+      const locationData = await getBrowserLocationWithHardTimeout();
 
       updateLocation(
         locationData.latitude,
         locationData.longitude,
-        locationData.horizontal_accuracy
+        locationData.accuracy
       );
     } catch (error: any) {
       console.error("Location error:", error);
 
       setLocationWarning(
-        "Lokatsiyani avtomatik olishning imkoni bo‘lmadi. Telefon yoki Telegram sozlamalarida lokatsiyaga ruxsat bering. Yoki xaritadan joyni qo‘lda tanlang."
+        "Lokatsiyani olib bo‘lmadi. Telefon sozlamalaridan Telegram/Chrome uchun Location ruxsatini yoqing. Yoki xaritadan joyni qo‘lda bosing."
       );
     } finally {
       setLoadingLocation(false);
